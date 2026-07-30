@@ -2,7 +2,7 @@
 # bootstrap.sh — cài PoC vendor-neutral harness vào DỰ ÁN HIỆN TẠI bằng 1 dòng,
 # KHÔNG cần clone repo. Tải lõi từ GitHub raw rồi gọi install.sh.
 #
-#   curl -fsSL https://raw.githubusercontent.com/Rheinmir/setup/orca/harness/poc-vendor-neutral/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dragonwar000/stackoverflow/main/harness/poc-vendor-neutral/bootstrap.sh | bash
 #
 # MẶC ĐỊNH = cài/update CẢ 3 TRỤ (harness + skills + llmwiki). Khỏi nhớ cờ gì.
 #
@@ -14,7 +14,7 @@
 #
 # Đổi nguồn/branch: HARNESS_BASE=https://raw.githubusercontent.com/<owner>/<repo>/<branch>/harness/poc-vendor-neutral
 set -euo pipefail
-BASE="${HARNESS_BASE:-https://raw.githubusercontent.com/Rheinmir/setup/orca/harness/poc-vendor-neutral}"
+BASE="${HARNESS_BASE:-https://raw.githubusercontent.com/dragonwar000/stackoverflow/main/harness/poc-vendor-neutral}"
 TARGET="$PWD"
 say(){ printf '\033[1;36m[bootstrap]\033[0m %s\n' "$*"; }
 command -v curl >/dev/null || { echo "cần curl" >&2; exit 1; }

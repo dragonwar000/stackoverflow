@@ -8,7 +8,7 @@
 # cả bốn lại: gõ một dòng, không phải nhớ gì.
 #
 # Cài (một dòng, thay <owner>/<repo>/<ref> cho fork của bạn):
-#   curl -fsSL https://raw.githubusercontent.com/dragonwar000/setup/graph-engineering/harness/poc-vendor-neutral/bootstrap-fork.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dragonwar000/stackoverflow/main/harness/poc-vendor-neutral/bootstrap-fork.sh | bash
 #
 # Đổi nguồn mà không sửa file — mọi biến đều override được:
 #   ... | FORK_OWNER=ai-do FORK_REPO=setup FORK_REF=main bash
@@ -21,8 +21,8 @@ set -euo pipefail
 # Mặc định trỏ fork dragonwar000 nhánh graph-engineering. Sửa 3 dòng này để có bản riêng
 # cho fork khác, hoặc truyền biến môi trường như trên.
 FORK_OWNER="${FORK_OWNER:-dragonwar000}"
-FORK_REPO="${FORK_REPO:-setup}"
-FORK_REF="${FORK_REF:-graph-engineering}"
+FORK_REPO="${FORK_REPO:-stackoverflow}"
+FORK_REF="${FORK_REF:-main}"
 
 RAW="https://raw.githubusercontent.com/$FORK_OWNER/$FORK_REPO/$FORK_REF"
 

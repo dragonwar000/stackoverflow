@@ -66,7 +66,7 @@ if [ -z "$HARNESS_REF" ] && [ -n "${REPO_RAW:-}" ]; then
       ;;
   esac
 fi
-HARNESS_REF="${HARNESS_REF:-orca}"
+HARNESS_REF="${HARNESS_REF:-main}"
 
 # REPO nguồn — cùng lớp lỗi với REF ở trên, phát hiện muộn hơn một vòng (UAT canary 2026-07-30).
 # Lần trước sửa REF nhưng vẫn hardcode `rheinmir/setup` ở 6 chỗ clone, nên canary chạy từ một
@@ -84,7 +84,7 @@ if [ -z "$HARNESS_REPO" ] && [ -n "${REPO_RAW:-}" ]; then
       ;;
   esac
 fi
-HARNESS_REPO="${HARNESS_REPO:-rheinmir/setup}"
+HARNESS_REPO="${HARNESS_REPO:-dragonwar000/stackoverflow}"
 [ "$PRINT_REF" = "1" ] && { echo "$HARNESS_REF"; exit 0; }
 
 src_ok() { [ -d "$1/harness/validators" ] && [ -d "$1/llmwiki/.claude/hooks" ]; }

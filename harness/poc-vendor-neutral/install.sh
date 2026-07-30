@@ -166,7 +166,7 @@ if [ "$WITH_WIKI" = 1 ]; then
   log "  ✓ llmwiki/ (wiki/{concepts,entities,sources/draft} · raw/ · index.md · log.md)"
   # tài liệu hướng dẫn overstack — TRAVEL cùng khung xương (luôn refresh bản mới nhất)
   if command -v curl >/dev/null 2>&1; then
-    REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/Rheinmir/setup/orca}"
+    REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/dragonwar000/stackoverflow/main}"
     mkdir -p "$ROOT/llmwiki/html"
     if curl -fsSL "$REPO_RAW/llmwiki/html/overstack.html" -o "$ROOT/llmwiki/html/overstack.html" 2>/dev/null; then
       log "  ✓ llmwiki/html/overstack.html (tài liệu overstack — mở bằng trình duyệt)"
@@ -248,7 +248,7 @@ if [ "$WITH_SKILLS" = 1 ]; then
   # Mở override để test được một nhánh khác (canary UAT): không có nó thì cài-từ-nhánh-X vẫn
   # kéo skill của `orca` → bài UAT chấm bản CŨ rồi báo PASS cho bản MỚI. Cổng nói dối mà vẫn
   # xanh còn tệ hơn không có cổng. HARNESS_BASE / REPO_RAW đã override được; dòng này thì chưa.
-  SKILLS_REF="${SKILLS_REF:-rheinmir/setup#orca}"
+  SKILLS_REF="${SKILLS_REF:-dragonwar000/stackoverflow#main}"
   log "+ cài bộ skill llmwiki (global, qua npx skills — ref: $SKILLS_REF)"
   if command -v npx >/dev/null; then
     npx -y skills add "$SKILLS_REF" --global --all 2>&1 | tail -4 | sed 's/^/    /' \
