@@ -18,7 +18,7 @@
 #   ... | bash -s -- --print-source
 set -euo pipefail
 
-# Mặc định trỏ fork dragonwar000 nhánh graph-engineering. Sửa 3 dòng này để có bản riêng
+# Mặc định trỏ CHÍNH repo này (dragonwar000/stackoverflow). Sửa 3 dòng này để có bản riêng
 # cho fork khác, hoặc truyền biến môi trường như trên.
 FORK_OWNER="${FORK_OWNER:-dragonwar000}"
 FORK_REPO="${FORK_REPO:-stackoverflow}"
