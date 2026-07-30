@@ -648,13 +648,35 @@ $SKELETON, ghi vào $JSON_OUT. Yêu cầu chất lượng:
   # --- STEP B: fill skeleton (python, no LLM) — thay {{TITLE}} + {{ONBOARD_JSON}} ---
   OUT="$PROJECT_ROOT/llmwiki/html/onboarding-${PROJECT_SLUG}.html"
   mkdir -p "$PROJECT_ROOT/llmwiki/html"
+  # ⚠ KHÔNG dùng sk.replace("{{ONBOARD_JSON}}", blob): skeleton nhắc token này 3 lần —
+  # 2 lần trong khối comment hướng dẫn (dòng ~7 và ~216) và 1 lần thật trong <script id="ob-data">.
+  # replace() thay cả 3 → JSON bị nhân ba, file phình từ ~60KB lên ~105KB và validate JSON sẽ hỏng.
+  # Chỉ nhắm token nằm trong <script id="ob-data"> và trong <title>, assert đúng 1 lần khớp.
   python3 - "$SKELETON" "$JSON_OUT" "$OUT" <<'PY'
-import json,sys,html
-sk=open(sys.argv[1]).read(); data=json.load(open(sys.argv[2]))
+import json,sys,html,re
+sk=open(sys.argv[1],encoding='utf-8').read(); data=json.load(open(sys.argv[2],encoding='utf-8'))
 name=(data.get("project") or {}).get("name","Project")
-out=sk.replace("{{TITLE}}",html.escape(name)).replace("{{ONBOARD_JSON}}",json.dumps(data,ensure_ascii=False))
-assert "{{ONBOARD_JSON}}" not in out and "{{TITLE}}" not in out, "token chưa thay hết"
-open(sys.argv[3],"w").write(out); print("✅ filled →",sys.argv[3],len(out),"bytes")
+blob=json.dumps(data,ensure_ascii=False)
+
+pat=re.compile(r'(<script id="ob-data"[^>]*>)\s*\{\{ONBOARD_JSON\}\}\s*(</script>)')
+out,n=pat.subn(lambda m: m.group(1)+blob+m.group(2), sk)
+assert n==1, f'ob-data script khớp {n} lần, phải là 1'
+out,n2=re.subn(r'(<title>)\{\{TITLE\}\}', lambda m: m.group(1)+html.escape(name), out)
+assert n2==1, f'title khớp {n2} lần'
+
+stripped=re.sub(r'<!--.*?-->','',out,flags=re.S)   # token trong comment hướng dẫn là bình thường
+left=re.findall(r'\{\{(?:TITLE|ONBOARD_JSON)\}\}',stripped)
+assert not left, f'còn token chưa thay: {left}'
+
+open(sys.argv[3],"w",encoding='utf-8').write(out); print("✅ filled →",sys.argv[3],len(out),"bytes")
+PY
+
+  # Đọc lại JSON island từ HTML đã sinh để chắc nó vẫn parse được (bỏ comment trước khi khớp).
+  python3 - "$OUT" <<'PY'
+import re,json,sys
+h=re.sub(r'<!--.*?-->','',open(sys.argv[1],encoding='utf-8').read(),flags=re.S)
+d=json.loads(re.search(r'<script id="ob-data"[^>]*>(.*?)</script>',h,re.S).group(1))
+print(f"✅ island OK — layers {len(d['architecture']['layers'])} · tour {len(d['tour'])} · modules {len(d['modules'])}")
 PY
 
   ls "$OUT" && echo "✅ Phase 4 done" || echo "❌ Phase 4 FAIL: HTML not found"
@@ -771,16 +793,17 @@ timestamp: YYYY-MM-DD
 
 **4. Update statuses & sync push — REQUIRED:**
 - Update Status column in draft file to reflect actual run
-- Clone `rheinmir/setup` branch `orca`, copy updated SKILL.md, push:
+- Clone `dragonwar000/stackoverflow` branch `main`, copy updated SKILL.md, push:
   ```bash
-  git clone git@github.com:rheinmir/setup.git /tmp/rheinmir-setup-sync -b orca --depth 1
-  cp ~/.agents/skills/orca-onboard/SKILL.md /tmp/rheinmir-setup-sync/skills/orca-onboard/SKILL.md
-  cd /tmp/rheinmir-setup-sync
+  git clone git@github.com:dragonwar000/stackoverflow.git /tmp/overstack-sync -b main --depth 1
+  cp ~/.agents/skills/orca-onboard/SKILL.md /tmp/overstack-sync/skills/orca-onboard/SKILL.md
+  cd /tmp/overstack-sync
   git add .
   git commit -m "skill: orca-onboard — wrap understand-anything, DeepSeek mechanical dispatch"
-  git push origin orca
-  rm -rf /tmp/rheinmir-setup-sync
+  git push origin main
+  rm -rf /tmp/overstack-sync
   ```
+  Push chỉ chạy khi người dùng đã duyệt — đây là hành động ra ngoài, và repo đích là public.
 
 > Skip Output Report only if skill produced zero artefacts and zero decisions.
 
@@ -839,15 +862,16 @@ proposed: YYYY-MM-DD
 
 **4. Update statuses & sync push — REQUIRED:**
 - Update Status column in draft file to reflect actual run
-- Clone `rheinmir/setup` branch `orca`, copy updated SKILL.md, push:
+- Clone `dragonwar000/stackoverflow` branch `main`, copy updated SKILL.md, push:
   ```bash
-  git clone git@github.com:rheinmir/setup.git /tmp/rheinmir-setup-sync -b orca --depth 1
-  cp ~/.agents/skills/orca-onboard/SKILL.md /tmp/rheinmir-setup-sync/skills/orca-onboard/SKILL.md
-  cd /tmp/rheinmir-setup-sync
+  git clone git@github.com:dragonwar000/stackoverflow.git /tmp/overstack-sync -b main --depth 1
+  cp ~/.agents/skills/orca-onboard/SKILL.md /tmp/overstack-sync/skills/orca-onboard/SKILL.md
+  cd /tmp/overstack-sync
   git add .
   git commit -m "skill: orca-onboard — wrap understand-anything, DeepSeek mechanical dispatch"
-  git push origin orca
-  rm -rf /tmp/rheinmir-setup-sync
+  git push origin main
+  rm -rf /tmp/overstack-sync
   ```
+  Push chỉ chạy khi người dùng đã duyệt — đây là hành động ra ngoài, và repo đích là public.
 
 > Skip Output Report only if skill produced zero artefacts and zero decisions.
