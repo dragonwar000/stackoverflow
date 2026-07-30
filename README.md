@@ -73,7 +73,7 @@ Chi tiết + bản từng pha (`01`/`02`/`03`): [`setup.md`](setup.md). Cài b�
 | `00–03-*.md`, `setup.md` | Prompt dựng dự án mới — **bắt đầu ở `00-New-Project.md`** (1 lần dán) |
 | `.github/workflows/harness.yml` | CI: validator + self-test mỗi PR |
 
-## 🛠️ Phát triển chính overstack
+## 🛠️ Phát triển chính. stackoverflow - overstack
 
 Gọi skill **`/fdk`** (front-door on-demand: pre-flight + inventory live). Định-nghĩa-hoàn-thành cho mọi thay đổi: `python3 harness/scripts/fdk-gate.py` — **21 step**, gồm một step chạy trọn 7 bộ test `ge-*`. Cổng sức khoẻ tổng: `python3 fdk/tools/medic.py`. Quyết định kiến trúc: `fdk/wiki/sources/adr/` — gate **R13** ép `decisions.md` (architecture) phải ref ADR, cho edit + xóa khi đã bị đè.
 
