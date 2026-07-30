@@ -1,4 +1,4 @@
-# overstack — the self-disciplined AI-agent framework
+# stackoverflow - overstack — the self-disciplined AI-agent framework
 
 **overstack** là một lớp khung (*a stack you put over your project*) biến AI Agent (Claude Code · opencode · Antigravity · Cursor…) thành một **cộng sự kỹ thuật tự-kỷ-luật**: có trí nhớ (nền tri thức `llmwiki/`), có nguyên tắc không thể phá (**guardrail** tất định chặn agent làm bậy, 0 token), có tay nghề đóng gói sẵn (skills), biết điều phối nhiều agent (Orca), và giữ được lịch sử thí nghiệm (**commit-DAG** local, không cần server).
 
@@ -73,7 +73,7 @@ Chi tiết + bản từng pha (`01`/`02`/`03`): [`setup.md`](setup.md). Cài b�
 | `00–03-*.md`, `setup.md` | Prompt dựng dự án mới — **bắt đầu ở `00-New-Project.md`** (1 lần dán) |
 | `.github/workflows/harness.yml` | CI: validator + self-test mỗi PR |
 
-## 🛠️ Phát triển chính overstack
+## 🛠️ Phát triển chính. stackoverflow - overstack
 
 Gọi skill **`/fdk`** (front-door on-demand: pre-flight + inventory live). Định-nghĩa-hoàn-thành cho mọi thay đổi: `python3 harness/scripts/fdk-gate.py` — **21 step**, gồm một step chạy trọn 7 bộ test `ge-*`. Cổng sức khoẻ tổng: `python3 fdk/tools/medic.py`. Quyết định kiến trúc: `fdk/wiki/sources/adr/` — gate **R13** ép `decisions.md` (architecture) phải ref ADR, cho edit + xóa khi đã bị đè.
 
