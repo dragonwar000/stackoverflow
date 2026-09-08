@@ -3,12 +3,13 @@
 Exit 2 = chặn dừng, Claude phải sửa index trước. Có guard chống lặp vô hạn."""
 import json
 import os
+import pathlib
 import re
 import subprocess
 import sys
 import time
 
-from hooklib import audit, code_log, find_validators, find_wiki_dir, project_dir, read_payload, resolve_tool, run_validator
+from hooklib import audit, code_log, find_validators, project_dir, read_payload, resolve_tool, run_validator, scope_config
 
 
 # file code (đa ngôn ngữ) trong git-status → trigger regen phần code-graph của wiki-graph.
@@ -61,29 +62,9 @@ def _debounced(root: str, key: str, require_ok: bool = False) -> bool:
 
 
 def _scope_config(root: str):
-    """GH#49: khai báo scope index TƯỜNG MINH qua .overstack.yaml tại root dự án — thay vì
-    ngầm-định code-root=repo-root. Parser tối giản (không thêm dep pyyaml), chỉ 2 khoá scalar:
-        wiki_dir: llmwiki/wiki        # wiki chính để dựng graph
-        code_root: src               # vùng code để index (relocate/thu hẹp được)
-    Fallback = hành vi cũ (llmwiki/wiki + '.') nếu thiếu file/khoá → KHÔNG hồi quy. Fail-open."""
-    wiki_dir, code_root = "llmwiki/wiki", "."
-    cfg = os.path.join(root, ".overstack.yaml")
-    if not os.path.isfile(cfg):
-        return wiki_dir, code_root
-    try:
-        for ln in open(cfg, encoding="utf-8"):
-            ln = ln.split("#", 1)[0].rstrip()
-            if ":" not in ln:
-                continue
-            k, v = ln.split(":", 1)
-            k, v = k.strip(), v.strip().strip("'\"")
-            if k == "wiki_dir" and v:
-                wiki_dir = v
-            elif k == "code_root" and v:
-                code_root = v
-    except Exception:
-        pass  # config hỏng → dùng mặc định, không chặn phiên
-    return wiki_dir, code_root
+    """GH#49 — MỘT nguồn: hooklib.scope_config(). Fallback = hành vi cũ (llmwiki/wiki + '.')."""
+    c = scope_config(root)
+    return c["wiki_dir"] or "llmwiki/wiki", c["code_root"] or "."
 
 
 def regen_docs(root: str) -> None:
@@ -208,8 +189,10 @@ def secondary_memory(root: str, session: str) -> None:
                                       capture_output=True, text=True, timeout=8).stdout.strip()
             changed = [ln[3:] for ln in dirty.splitlines() if len(ln) > 3][:8]
             did = subject or "(phiên có sửa, chưa commit)"
+            # --parent auto: nối episode này vào phiên NGAY TRƯỚC → một CHUỖI đọc được
+            # (mem-rank chain), thay vì một đống episode rời không biết cái nào tiếp cái nào.
             subprocess.run([sys.executable, mr, "episode", did,
-                             "--files", ",".join(changed), "--session", session],
+                             "--files", ",".join(changed), "--session", session, "--parent", "auto"],
                            cwd=root, capture_output=True, timeout=15)
         except Exception:
             pass
@@ -276,6 +259,67 @@ def wiki_changed(root: str) -> bool:
         return False
 
 
+# Câu refusal mà PROVIDER chèn khi lượt bị cắt — KHÔNG phải model sinh ra sau khi suy luận.
+# Dấu hiệu phân biệt (đo 2026-08-06, phiên CoopCons 59f19d72): usage TỔNG = 0 ở mọi trường,
+# trong khi 42 lượt bình thường cùng phiên có trung vị 40.773 token. Refusal THẬT của model
+# luôn tốn output token, nên `usage == 0` là ranh giới an toàn: chỉ ép chạy tiếp khi chắc chắn
+# đây là nhiễu hạ tầng, tuyệt đối không đè lên một lời từ chối có lý do.
+PROVIDER_NULL_REFUSAL = "I'm sorry, but I cannot assist with that request."
+
+
+def provider_stall(transcript_path: str) -> bool:
+    """Lượt cuối có phải refusal RỖNG do provider chèn không (usage=0)?
+
+    Trước bản này: refusal kết thúc lượt → agent đứng im chờ người gõ 'continue'. Đo được
+    9 lần gõ tay trong một phiên, cách nhau 25-115 phút. Fail-open tuyệt đối: không đọc được
+    transcript thì trả False, không bao giờ tự ý chặn dừng."""
+    if not transcript_path:
+        return False
+    try:
+        last = None
+        with open(transcript_path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except Exception:
+                    continue
+                if r.get("type") == "assistant":
+                    last = r
+        if not last:
+            return False
+        msg = last.get("message") or {}
+        blocks = msg.get("content")
+        if not isinstance(blocks, list):
+            return False
+        text = " ".join(b.get("text", "") for b in blocks
+                        if isinstance(b, dict) and b.get("type") == "text")
+        if PROVIDER_NULL_REFUSAL not in text:
+            return False
+        usage = msg.get("usage") or {}
+        return sum(v for v in usage.values() if isinstance(v, int)) == 0
+    except Exception:
+        return False  # fail-open: hạ tầng lỗi không được phá phiên
+
+
+def all_wiki_dirs(root: str):
+    """MỌI wiki có thật của repo (ADR-008: repo framework có cả fdk/wiki lẫn llmwiki/wiki).
+
+    Khác hooklib.find_wiki_dir() — hàm đó trả đúng MỘT (fdk/wiki thắng) và 3 caller khác chỉ cần
+    biết "có wiki hay không". Auto-index + R3 ở Stop thì phải soi cùng tập wiki như CI (GH#76).
+    """
+    out = []
+    declared = scope_config(root)["wiki_dir"]          # GH#49: wiki relocate qua .overstack.yaml
+    for cand in ([pathlib.Path(root) / declared] if declared else []) + [
+            pathlib.Path(root) / "fdk" / "wiki", pathlib.Path(root) / "wiki",
+            pathlib.Path(root) / ".llmwiki" / "wiki", pathlib.Path(root) / "llmwiki" / "wiki"]:
+        if cand.is_dir() and cand not in out:
+            out.append(cand)
+    return out
+
+
 def main() -> None:
     payload = read_payload()
     audit(payload, "Stop")
@@ -288,6 +332,33 @@ def main() -> None:
     tp = payload.get("transcript_path")  # Trụ 1 Cost Attribution: 1 cost record / run, upsert theo session (cumulative, idempotent)
     if tp:
         code_log(root, "--run-cost", f"--transcript={tp}", f"--session={payload.get('session_id') or ''}")
+        # okf-scan verify: đối chiếu transcript xem agent MỞ bao nhiêu mục đã trả về đầu phiên.
+        # Vế đầu của biên lai (SessionStart) chứng minh việc quét đã chạy; vế này chứng minh —
+        # hoặc bác bỏ — rằng thứ quét được có được đọc. Thiếu nó thì "đã nạp context" là lời khai.
+        ok_tool = resolve_tool(root, "harness/scripts/okf-scan.py")
+        if ok_tool:
+            try:
+                subprocess.run([sys.executable, ok_tool, "verify", "--session",
+                                payload.get("session_id") or "", "--transcript", tp, "--root", root],
+                               cwd=root, capture_output=True, timeout=20)
+            except Exception:
+                pass
+
+    # ANTI-IDLE: provider cắt lượt bằng refusal rỗng → chặn dừng, bảo agent làm tiếp.
+    # `stop_hook_active` đã được guard ở đầu main() nên không lặp vô hạn.
+    if provider_stall(tp):
+        reason = ("Lượt trước bị cắt bởi một refusal RỖNG từ provider (usage=0 token) — "
+                  "đó là nhiễu hạ tầng, KHÔNG phải kết luận của bạn. Hãy tiếp tục đúng "
+                  "việc đang dở, đừng hỏi lại người dùng.")
+        # HAI RUNTIME, HAI GIAO THỨC — phải nói cả hai thứ tiếng:
+        #   Claude Code : exit 2 + stderr  → chặn dừng.
+        #   OpenClaude  : JSON stdout {"decision":"block"} → chặn dừng; nó KHÔNG hiểu exit 2.
+        # Đo 2026-08-06 (phiên CoopCons c4b5069a): bản chỉ-exit-2 khiến openclaude xếp thông
+        # điệp vào `hookErrors` và preventedContinuation VẪN false — hook nói mà runtime không
+        # nghe. Bằng chứng trong bundle: blocked = isSyncHookJSONOutput(j) && j.decision==="block".
+        print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False))
+        print("[anti-idle] " + reason, file=sys.stderr)
+        sys.exit(2)
     # THỨ TỰ CÓ CHỦ ĐÍCH: thứ SINH nội dung chạy trước thứ RENDER nội dung.
     # secondary_memory ghi session-provenance vào wiki và sinh lại memory-map; regen_docs
     # dựng wiki-graph + overstack (overstack NHÚNG memory-map). Thứ tự cũ ngược lại nên
@@ -300,23 +371,29 @@ def main() -> None:
     if not wiki_changed(root):
         sys.exit(0)  # phiên không đụng wiki → không can thiệp
 
-    wiki = find_wiki_dir(root)
+    wikis = all_wiki_dirs(root)
     vdir = find_validators(root)
-    if wiki is None or vdir is None:
+    if not wikis or vdir is None:
         sys.exit(0)
 
     # (1) AUTO-INDEX: tự thêm row cho file wiki MỚI vào index.md (self-heal) NGAY khi có thay đổi —
     # index khớp mà không bắt agent sửa tay. Chiều 'stale' (xóa file mà còn row) vẫn để check bên dưới
     # chặn (gỡ row là quyết định của người). Fail-open: lỗi git/python → bỏ qua, không chặn lượt.
-    try:
-        subprocess.run([sys.executable, os.path.join(vdir, "index_sync.py"),
-                        "--wiki-dir", str(wiki), "--fix"], capture_output=True, timeout=15)
-    except Exception:
-        pass
-
-    rc, err = run_validator("index_sync.py", {"action": "stop", "wiki_dir": str(wiki)}, vdir)
-    if rc == 2:
-        print(err, file=sys.stderr)
+    # Chạy trên TỪNG wiki (GH#76): find_wiki_dir() chỉ trả fdk/wiki ở repo framework, trong khi
+    # distill() ghi vào llmwiki/wiki và harness-events.py R3 soi llmwiki/wiki → auto-heal chữa wiki A,
+    # kẻ chặn soi wiki B, agent vá tay index mỗi phiên. CI đã soi cả hai root; hook phải khớp CI.
+    errs = []
+    for wiki in wikis:
+        try:
+            subprocess.run([sys.executable, os.path.join(vdir, "index_sync.py"),
+                            "--wiki-dir", str(wiki), "--fix"], capture_output=True, timeout=15)
+        except Exception:
+            pass
+        rc, err = run_validator("index_sync.py", {"action": "stop", "wiki_dir": str(wiki)}, vdir)
+        if rc == 2:
+            errs.append(err)
+    if errs:
+        print("\n".join(e for e in errs if e), file=sys.stderr)
         sys.exit(2)
     sys.exit(0)
 

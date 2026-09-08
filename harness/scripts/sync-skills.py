@@ -26,9 +26,11 @@ LOOP_MAP = {
     # dev-loop
     "impact-check": "dev-loop", "new-project-setup": "dev-loop", "onboard-codebase": "dev-loop",
     "propose": "dev-loop", "plan": "dev-loop", "safe-change": "dev-loop",
+    "playwright-verify": "dev-loop",
     "verify-before-commit": "dev-loop", "build-now-adapt-later": "dev-loop", "ship": "dev-loop",
     "new-skill": "dev-loop", "loop-runner": "dev-loop", "failure-flywheel": "dev-loop", "wikieval": "dev-loop",
     "skill-provenance": "dev-loop", "qc-code": "dev-loop", "teach-me": "dev-loop",
+    "doyourmagic": "dev-loop",
     # orchestrate
     "orca-dispatch-reference": "orchestrate", "orca-onboard": "orchestrate", "orca-issue": "orchestrate",
     "orca-handover": "orchestrate",
@@ -40,7 +42,7 @@ LOOP_MAP = {
     "record-episode": "wiki-loop",
     # utils
     "agent-reach": "utils",
-    "cavecrew": "utils", "caveman": "utils", "fable5": "utils",
+    "cavecrew": "utils", "caveman": "utils", "fable5": "utils", "graph-mode": "utils",
     "i-have-adhd": "utils", "caveman-commit": "utils", "caveman-compress": "utils",
     "caveman-help": "utils", "caveman-review": "utils", "caveman-stats": "utils",
     "extract-site": "utils", "harness-tour": "utils",
@@ -52,13 +54,14 @@ LOOP_MAP = {
     "orca-cli": "orchestrate", "orchestration": "orchestrate", "jenkins-agent-l3-deploy": "orchestrate",
     "brandkit": "utils", "check-approve": "utils", "computer-use": "utils",
     "design-taste-frontend": "utils", "design-taste-frontend-v1": "utils", "docs-site-macos": "utils",
-    "web-crawl": "utils", "web-clone": "utils", "hallmark": "utils",
+    "web-crawl": "utils", "web-clone": "utils", "hallmark": "utils", "diagram": "utils",
     "find-skills": "utils", "full-output-enforcement": "utils", "gpt-taste": "utils",
     "high-end-visual-design": "utils", "image-to-code": "utils", "imagegen-frontend-mobile": "utils",
     "imagegen-frontend-web": "utils", "industrial-brutalist-ui": "utils", "join-project": "utils",
     "last30days": "utils", "minimalist-ui": "utils", "redesign-existing-projects": "utils",
     "snapshot-push": "utils", "stitch-design-taste": "utils", "tour-guide-supademo": "utils",
     "tour-guide": "utils",
+    "fable5": "utils",
 }
 
 

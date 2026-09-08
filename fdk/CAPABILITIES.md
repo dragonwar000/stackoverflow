@@ -1,7 +1,7 @@
 <!-- SINH BẰNG CODE: build-capabilities.py — ĐỪNG sửa tay; chạy lại để cập nhật. -->
 # CAPABILITIES — toàn bộ đồ nghề (luôn-mới, đếm từ đĩa)
 
-**84 skill · 18 rule · 19 fdk-tool · 66 harness-script.** Agent: đây là danh sách ĐẦY ĐỦ những gì bạn có để dùng. Tìm nhanh: `python3 fdk/tools/build-skill-search.py` rồi `find-skill "<việc cần làm>"`. Phát triển framework: gọi `/fdk`.
+**88 skill · 19 rule · 23 fdk-tool · 72 harness-script.** Agent: đây là danh sách ĐẦY ĐỦ những gì bạn có để dùng. Tìm nhanh: `python3 fdk/tools/build-skill-search.py` rồi `find-skill "<việc cần làm>"`. Phát triển framework: gọi `/fdk`.
 
 ## Skills (gọi bằng `/<tên>`)
 
@@ -12,8 +12,9 @@
 - **`/record-episode`** — Ghi một SESSION EPISODE có cấu trúc (tầng nhớ episodic) vào memory store để phiên sau truy…
 - **`/wiki-room`** — Mở room (subagent 1 tầng) nạp chi tiết wiki khi context phiên chính đã rot
 
-### dev-loop (16)
+### dev-loop (18)
 - **`/build-now-adapt-later`** — When a task is blocked by missing or unverified information (an undocumented protocol, an …
+- **`/doyourmagic`** — Given a freshly-cloned external repo/tool, run clone→explore→verify→write to produce a bun…
 - **`/failure-flywheel`** — Capture each agent failure, bucket and count it deterministically, and when a failure clas…
 - **`/impact-check`** — Map all callers and dependents of a symbol before modifying shared code
 - **`/loop-runner`** — Deterministic guardrailed agent-loop driver
@@ -21,12 +22,13 @@
 - **`/new-skill`** — Scaffold a new skill into both publish trees at once
 - **`/onboard-codebase`** — Deep codebase analysis
 - **`/plan`** — Mở rộng một draft SPEC ĐÃ ĐƯỢC DUYỆT thành kế hoạch thi hành được
+- **`/playwright-verify`** — Cài + dùng Playwright bằng standalone .mjs script (không qua npx playwright test / *.spec.…
 - **`/propose`** — Plan a feature before coding
 - **`/qc-code`** — Review code phong cách SENIOR 10 năm
 - **`/safe-change`** — Modify shared code without breaking existing callers
 - **`/ship`** — Workflow chốt PUSH/RELEASE/PR/MR
 - **`/skill-provenance`** — Ghi và kiểm provenance (nguồn + sha256 checksum) cho skill
-- **`/teach-me`** — Giải thích MỘT thứ (một file, hàm, tính năng, hay hệ thống) theo cấu trúc cố định: cách ch…
+- **`/teach-me`** — Giải thích MỘT thứ (một file, hàm, tính năng, cơ chế, hay hệ thống) theo cấu trúc cố định …
 - **`/verify-before-commit`** — Gate every commit
 - **`/wikieval`** — Turn wiki golden pages into a CI-blocking eval suite with a cheap→expensive assertion casc…
 
@@ -45,7 +47,7 @@
 - **`/trace-grader`** — Score the PATH an agent took (tool choice, ordering, retries, repeatability, grounding)
 - **`/wayfinder`** — Lập bản đồ cho một chunk việc QUÁ LỚN với một phiên agent và còn MÙ MỜ
 
-### utils (50)
+### utils (52)
 - **`/agent-reach`** — MUST USE when user wants to research/search/look up/find anything on the internet
 - **`/brandkit`** — Premium brand-kit image generation skill for creating high-end brand-guidelines boards, lo…
 - **`/cavecrew`** — Decision guide for delegating to caveman-style subagents
@@ -60,6 +62,7 @@
 - **`/cursor-animated-sites`** — Build an interactive "cursor-animated walkthrough" page on top of the /docs-site-macos gla…
 - **`/design-taste-frontend`** — Anti-slop frontend skill for landing pages, portfolios, and redesigns
 - **`/design-taste-frontend-v1`** — The original v1 taste-skill, preserved for projects depending on its exact behavior
+- **`/diagram`** — Vẽ SƠ ĐỒ và BIỂU ĐỒ bằng máy, không để model tự bịa hình
 - **`/docs-curate`** — Sắp xếp gọn kho tài liệu LOCAL (llmwiki/html/ + wiki/sources/draft/) khi phình to
 - **`/docs-site-macos`** — Build a beautiful macOS-inspired documentation site (single HTML file) with a liquid-glass…
 - **`/extract-site`** — Extract and convert a website or docs site into clean markdown
@@ -70,6 +73,7 @@
 - **`/frontier-scan`** — Quét biên giới agent-framework 30 ngày qua và đối chiếu overstack theo 8 trục (frontier-ga…
 - **`/full-output-enforcement`** — Overrides default LLM truncation behavior
 - **`/gpt-taste`** — Elite UX/UI & Advanced GSAP Motion Engineer
+- **`/graph-mode`** — Bật luật chứng cứ evidence-chain (R19) cho phần CHAT
 - **`/hallmark`** — SÀN design mặc định của overstack (anti-AI-slop)
 - **`/harness-tour`** — Tour
 - **`/harness-update`** — TỰ BẢO TRÌ framework overstack trên máy user (self-maintain)
@@ -116,6 +120,7 @@
 - **R16** — report-show-path
 - **R17** — problem-tree-flush
 - **R18** — plan-executable
+- **R19** — evidence-terminal
 
 ## FDK tools (`python3 fdk/tools/<x>`)
 - `artifacts.py`
@@ -133,8 +138,12 @@
 - `medic.py`
 - `memory-map.py`
 - `new-skill.py`
+- `prose-antipattern.py`
 - `skill-provenance.py`
 - `skill-usage.py`
+- `supply-watch.py`
+- `ui-detect.py`
+- `visual-receipt.py`
 - `whiteboard-skill-map.py`
 - `wiki-relations.py`
 
@@ -166,6 +175,7 @@
 - `flywheel.py`
 - `frontier.py`
 - `grounding-check.py`
+- `handoff-log.py`
 - `harness-doctor.py`
 - `harness-lint.py`
 - `health-check.py`
@@ -176,8 +186,10 @@
 - `mem-proxy.py`
 - `mem-rank.py`
 - `okf-check.py`
+- `okf-scan.py`
 - `orca-dispatch.py`
 - `orca-reconcile.py`
+- `overstack_paths.py`
 - `ovs-notes.py`
 - `prospect-critic.py`
 - `provenance-log.py`
@@ -187,6 +199,8 @@
 - `retrieval-eval.py`
 - `scoped-hooks.py`
 - `scratch-log.py`
+- `self-report.py`
+- `session-continue.py`
 - `skill-health.py`
 - `skill-registry.py`
 - `skill-resolve-eval.py`
@@ -195,6 +209,7 @@
 - `sweep-gate.py`
 - `sync-skills.py`
 - `sync-template.py`
+- `token-attrib.py`
 - `token-budget.py`
 - `trace-grader.py`
 - `trace-otel.py`
@@ -206,7 +221,7 @@
 - `wiki-sync.py`
 - `wikieval.py`
 
-## Neo bằng chứng — 212/212 năng lực có neo KHAI BÁO
+## Neo bằng chứng — 227/227 năng lực có neo KHAI BÁO
 **Đọc cho đúng: đây KHÔNG phải bằng chứng năng lực còn SỐNG.** Mỗi năng lực được map tất định tới một *điểm neo* bằng chứng trên đĩa (frontmatter `proof:` > rule-map > tests > self-test > golden > medic). Việc map là **tĩnh** — nó kiểm file/chuỗi có mặt, **không thực thi gì cả**. Nó bắt được ca 'năng lực này chẳng có test/golden/rule nào neo vào' (hữu ích thật), nhưng KHÔNG bắt được ca 'test có mà đỏ' hay 'engine có mà chết'. Muốn biết một dependency ngoài còn sống thì hỏi `harness/scripts/dep-health.py`. Chi tiết neo: `build-capabilities.py --capproof-json`.
 
 ## TRÙNG-ỨNG-VIÊN (19) — máy phát hiện, NGƯỜI phán (dedupe = vòng /propose riêng)

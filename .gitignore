@@ -42,7 +42,10 @@ fdk/html/*.html
 harness/metrics/cost-by-session.json
 harness/metrics/tokens.jsonl
 .DS_Store
-harness/metrics/tasks.json
+# harness/metrics/tasks.json — KHONG ignore nua (2026-08-03).
+# So task la nguon chan ly de validate `task:` trong draft DA COMMIT. De no local-only thi
+# clone moi co so RONG, va moi task-ref trong draft lich su thanh 'tro task la' ngay khi ai do
+# mint task dau tien — do that trong phien 03/08: 0 loi -> 18 loi chi vi file duoc tao ra.
 
 harness/metrics/query-log.jsonl
 
@@ -59,3 +62,9 @@ llmwiki/wiki/sources/draft/archive/
 
 # mem-rank local memory store
 harness/metrics/memory.jsonl
+
+# Stop hook debounce state (p-45: build-wiki-graph 49s + medic --ci 26s fired ~mọi lượt)
+harness/metrics/.stop-debounce.json
+
+# okf-scan context receipts
+harness/metrics/context-receipts.jsonl

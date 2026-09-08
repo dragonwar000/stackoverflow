@@ -71,6 +71,8 @@ STEPS = [
         "python3 harness/scripts/trace-grader.py --self-test >/dev/null && "
         "python3 harness/scripts/loop-runner.py selftest >/dev/null && "
         "python3 harness/scripts/wikieval.py --self-test >/dev/null && "
+        "python3 harness/scripts/handoff-log.py --self-test >/dev/null && "
+        "python3 harness/scripts/scratch-log.py --self-test >/dev/null && "
         "python3 harness/scripts/failure-flywheel.py --root . --report >/dev/null && "
         "python3 harness/scripts/success-flywheel.py --self-test >/dev/null && "
         "python3 harness/scripts/egress-guard.py --self-test >/dev/null && "
@@ -85,6 +87,7 @@ STEPS = [
         "python3 harness/scripts/wiki-graph.py --self-test >/dev/null && "
         "python3 harness/scripts/provenance-log.py --self-test >/dev/null && "
         "python3 harness/scripts/claim-receipts.py --self-test >/dev/null && "
+        "python3 harness/scripts/token-attrib.py --self-test >/dev/null && "
         "python3 harness/scripts/prospect-critic.py --self-test >/dev/null && "
         "python3 harness/scripts/web-crawl.py --self-test >/dev/null && "
         "python3 harness/scripts/web-clone.py --self-test >/dev/null && "
@@ -104,8 +107,12 @@ STEPS = [
         "python3 harness/scripts/dep-health.py --self-test >/dev/null && "
         "python3 harness/scripts/orca-dispatch.py --self-test >/dev/null && "
         "python3 harness/scripts/orca-reconcile.py --self-test >/dev/null && "
-        "python3 harness/scripts/hub.py --self-test >/dev/null"],
-     "33 chức năng BNAL — self-test phải còn PASS (giữ verified trung thực)"),
+        "python3 harness/scripts/hub.py --self-test >/dev/null && "
+        "python3 harness/scripts/overstack_paths.py --self-test >/dev/null && "
+        "python3 harness/scripts/session-continue.py --self-test >/dev/null && "
+        "python3 harness/scripts/okf-scan.py --self-test >/dev/null && "
+        "python3 harness/scripts/self-report.py --self-test >/dev/null"],
+     "37 chức năng BNAL — self-test phải còn PASS (giữ verified trung thực)"),
 ]
 
 

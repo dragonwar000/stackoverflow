@@ -20,6 +20,15 @@ Trước khi sửa hay xây bất cứ thứ gì, hỏi **"vì sao"** cho tới 
 - **Nghi ngờ chẩn đoán đầu tiên của chính mình.** Nó thường là suy luận từ triệu chứng chứ chưa đọc code. Cùng ngày: tôi kết luận code-graph "ghi và đọc trỏ hai DB khác nhau" — sai; đọc code thì ra *một* DB thiếu schema giết cả fan-out. Chẩn đoán chỉ được tin sau khi **tái hiện** được.
 - **Ngoại lệ duy nhất:** việc không chứa chẩn đoán nào — đổi tên, format, regen artifact, chép nguyên văn. Việc nào có chữ "sửa", "hỏng", "vì sao", "sao lại thế" thì luôn chạy.
 
+## Chứng cứ trong CHAT — opt-in qua `/graph-mode`, không auto-bơm mỗi phiên
+
+Luật chuỗi-lập-luận-phải-chạm-chứng-cứ (6 loại điểm cuối, chi tiết [[evidence-terminal-chain]])
+GIỜ nằm ở `skills/graph-mode/SKILL.md`, không còn bơm mặc định vào mọi phiên — kỷ luật này buộc
+trích dẫn/mở file nhiều hơn mỗi câu trả lời (nặng token), nên chỉ bật khi thật cần độ tin cậy cao
+(audit, ADR, chẩn đoán lan rộng). Gọi `/graph-mode` để bật, "tắt graph mode"/"normal mode" để tắt.
+Validator máy trên tài liệu ```evidence-chain (R19, `harness/validators/evidence_terminal.py`) KHÔNG
+phụ thuộc skill này — luôn chạy qua `harness/policy.yaml` bất kể graph-mode bật hay tắt.
+
 ## Cái thang chống over-engineering — chạy khi VIẾT/SỬA code
 Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponytail, MIT — nguồn `060726-ponytail-distill`.)
 
@@ -61,6 +70,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `wiki-room` | Context phiên chính rot — mở room 1 tầng nạp chi tiết wiki (budget cứng) | `skills/wiki-loop/wiki-room.md` | wiki-loop |
 | `record-episode` | Chốt phiên vào tầng nhớ episodic (mem-rank store) để phiên sau truy hồi "phiên trước làm gì" theo nghĩa | `skills/wiki-loop/record-episode.md` | wiki-loop |
 | `lint` | After every 10 ingests, or wiki feels stale | `skills/wiki-loop/lint.md` | wiki-loop |
+| `playwright-verify` | Verify code nhanh bằng Playwright standalone `.mjs` (không qua test runner): chụp ảnh `localhost`/`file://`, đọc console/pageerror, đo `getBoundingClientRect` khi phần tử "không thấy/không bấm được", auth bypass dev-login. Dùng khi claude-in-chrome bị chặn localhost. | `skills/dev-loop/playwright-verify.md` | dev-loop |
 | `propose` | Any new feature or change is requested | `skills/dev-loop/propose.md` | dev-loop |
 | `qc-code` | Review code phong cách senior 10 năm — 4 mục (security/performance/naming/logic) điểm/10 + lỗi nặng nhất + fix + verdict PASS/CẦN SỬA; sinh test tái hiện qc-* auto-chạy tất định. KHÁC /orca-sec-scans (Trivy tĩnh) | `skills/dev-loop/qc-code.md` | dev-loop |
 | `teach-me` | Giải thích MỘT thứ ở 2 cấp (hệ thống + code) + bộ ba (vấn đề/workflow/chi tiết os·cơ chế·vai trò) + tóm tắt luồng, mỗi phần có sơ đồ; CHỨNG bằng runtime thật (chạy + breakpoint/debugger), không đoán tĩnh. KHÁC /onboard-codebase (cả dự án→wiki) | `skills/dev-loop/teach-me.md` | dev-loop |
@@ -76,6 +86,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `orca-issue` | Sự cố/bug/regression — vòng repro-first → fix red→green → distill kép | `skills/orchestrate/orca-issue.md` | orchestrate |
 | `wayfinder` | Việc QUÁ LỚN một phiên & còn mù mờ — bản đồ ticket QUYẾT ĐỊNH (fog of war/frontier/out-of-scope), giải từng cái tới khi đường rõ. TRƯỚC /propose. Chỉ-gọi-tay | `skills/orchestrate/wayfinder.md` | orchestrate |
 | `onboard-codebase` | Deep analysis of legacy code to populate Wiki | `skills/dev-loop/onboard-codebase.md` | dev-loop |
+| `doyourmagic` | Freshly-cloned external repo/tool → clone→explore→analysis→write-workflows, sinh bộ `doyourmagic/<repo-name>/workflows.md` + `index.html` chạy được ngay. KHÁC `onboard-codebase` (phân tích DỰ ÁN CHÍNH → wiki nội bộ, không phải tool ngoài) | `skills/dev-loop/doyourmagic.md` | dev-loop |
 | `sync-template` | Upstreaming template improvements to master repo | `skills/utils/sync-template.md` | utils |
 | `md-to-html` | User wants to render a professional HTML report | `skills/utils/md-to-html.md` | utils |
 | `docs-site-macos` | User wants macOS-style documentation site | `skills/utils/docs-site-macos.md` | utils |
@@ -96,6 +107,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `frontier-scan` | Quét đối thủ + đối chiếu overstack 8 trục (gọi instant) — "frontier scan", "chúng ta thua gì" | `skills/utils/frontier-scan.md` | utils |
 | `brandkit` | Premium brand-kit image generation skill for creating high-end… | `skills/utils/brandkit.md` | utils |
 | `hallmark` | **NỀN design mặc định** (Together AI) — 6 discipline + 57 cổng slop-test, từ chối trông AI-generated. Mọi UI đứng trên nó; skill taste khác là flavour. 4 verb: build/audit/redesign/study. Xem [[design-foundation]] | `skills/utils/hallmark.md` | utils |
+| `diagram` | Vẽ SƠ ĐỒ (hộp+mũi tên) và BIỂU ĐỒ (số liệu) bằng máy — router tới `archify` cho sơ đồ, `dataviz` + kỷ luật lieflat cho biểu đồ; model điền tờ khai, code dựng hình, cổng soi hình học rồi mới giao | `skills/utils/diagram.md` | utils |
 | `build-now-adapt-later` | When a task is blocked by missing or unverified information (an… | `skills/dev-loop/build-now-adapt-later.md` | dev-loop |
 | `cavecrew` | Decision guide for delegating to caveman-style subagents. | `skills/utils/cavecrew.md` | utils |
 | `i-have-adhd` | Định hình OUTPUT cho người đọc ADHD — hành động trước, đánh số bước, nêu lại state mỗi lượt, chặn lạc đề, ước lượng thời gian cụ thể, không mở bài/kết bài xã giao. Áp cho phần CHAT; tài liệu người đọc vẫn theo luật văn xuôi đầy đủ | `skills/utils/i-have-adhd.md` | utils |
@@ -112,6 +124,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `design-taste-frontend-v1` | The original v1 taste-skill, preserved for projects depending on its exact… | `skills/utils/design-taste-frontend-v1.md` | utils |
 | `extract-site` | Extract and convert a website or docs site into clean markdown (full-code clone → see `web-clone`) | `skills/utils/extract-site.md` | utils |
 | `fable5` | Reasoning protocol distilled from Claude Fable 5 — Floor check, multi-hypothesis diagnosis, adversarial self-review, Constraint Loop. Persists for the session like `/caveman` once invoked | `skills/utils/fable5.md` | utils |
+| `graph-mode` | Bật luật chứng cứ evidence-chain (R19) cho CHAT — mọi kết luận phải chạm điểm cuối xem được (observed/tool-record/graph-edge/web/parametric/absence). Nặng token nên opt-in, không auto-bơm mỗi phiên; tắt bằng "tắt graph mode"/"normal mode" | `skills/utils/graph-mode.md` | utils |
 | `find-skills` | Helps users discover and install agent skills when they ask questions like… | `skills/utils/find-skills.md` | utils |
 | `full-output-enforcement` | Overrides default LLM truncation behavior. | `skills/utils/full-output-enforcement.md` | utils |
 | `gpt-taste` | Elite UX/UI & Advanced GSAP Motion Engineer. | `skills/utils/gpt-taste.md` | utils |

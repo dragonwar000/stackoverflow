@@ -165,8 +165,9 @@ Mọi cỡ màn hình đều dùng LEFT SIDEBAR + nút collapse. ⛔ KHÔNG có 
 ⚠️ **Sidebar PHẢI là kính thật, không phải tấm trắng sữa** (bài học 12/06/2026 — user chê "màu trơn trông hơi chắn"): fill phẳng `--glass-1` alpha .55 trên nền sáng ra "sữa" đục, không ra gương. Pane chrome LỚN (sidebar, panel cao full màn) bắt buộc 3 thứ: (1) **gradient-alpha glass** — alpha biến thiên dọc mặt kính thay vì một hằng số; (2) **specular sheen** `::before` — vùng sáng radial góc trên + dải sheen chéo; (3) **orb màu ngay sau lưng pane** (xem Background Plane) — blur 24px phải có màu thật để nghiền. `--glass-1` chỉ còn dùng cho floating panel nhỏ:
 
 ```css
+:root{--nav-pad-y:18px}   /* nguồn chân lý duy nhất cho khoảng đệm dọc của nav — .theme-row (§Theme Toggle) đọc lại biến này, KHÔNG hard-code số riêng, để 2 chỗ không thể lệch nhau (bài học 200826: bug thật, xem lịch sử) */
 nav{position:fixed;top:0;left:0;bottom:0;width:200px;z-index:100;
-  display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:18px 12px;
+  display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:var(--nav-pad-y) 12px;
   background:linear-gradient(165deg,rgba(255,255,255,.46) 0%,rgba(255,255,255,.22) 48%,rgba(240,248,255,.34) 100%);
   backdrop-filter:blur(var(--blur-1)) saturate(1.7) brightness(1.04);
   -webkit-backdrop-filter:blur(var(--blur-1)) saturate(1.7) brightness(1.04);
@@ -221,6 +222,8 @@ Ripple ink là LIQUID GLASS, không phải vệt màu phẳng: specular highligh
 })();
 ```
 Chạy SAU script tạo .nav-toggle để nút toggle cũng có ripple.
+
+**Liên quan §Theme Toggle sáng/tối (bên dưới, dòng ~952):** `.theme-row` là con trực tiếp của cùng `nav` này, dùng chung biến `--nav-pad-y` khai ở CSS `nav` phía trên — sửa padding của `nav` thì `.theme-row` tự theo, không cần sửa 2 chỗ.
 
 - Tier-1 glass cho cả hai dạng
 - Scroll spy via IntersectionObserver watching `section[id]` (selector `nav a` không đổi)
@@ -584,6 +587,197 @@ Notes:
 - **Auto-fit**: on drag release the SVG `viewBox` grows to contain dragged nodes, so the svg height (and the box) sizes WITH the content — nodes never get clipped after release. `svg{overflow:visible}` keeps a node visible mid-drag too. `fitViewBox()` runs on pointerup + reset.
 - Idempotent (`dataset.draggable` guard); `resize:vertical` lets the user grow the container; flex viewport fills new height.
 
+### Mermaid Diagram Engine (auto-layout, for complex diagrams)
+
+The hand-authored path above works because the LLM hand-picks every node's `x`/`y` — fine for small diagrams (≤~5 nodes, mostly linear), but coordinates get uneven once a diagram has real branching, because there is no layout algorithm behind it, only judgment. **Use this Mermaid path instead when a diagram has ≥6 nodes OR has branches/merges** — anything a real auto-layout engine earns its cost on. Below that threshold, stay on the hand-SVG path (ladder: YAGNI — don't pull in a 1.5MB engine for a 3-box flow).
+
+This renders real Mermaid DSL through `beautiful-mermaid` (MIT, `github.com/lukilabs/beautiful-mermaid`) — a synchronous renderer built on ELK.js, chosen over official Mermaid.js because it's lighter, has no async flash, and its two-color theme (`bg`/`fg` + optional `line`/`accent`/`muted`/`surface`/`border`) is CSS-custom-properties on the `<svg>` root, so it re-themes instantly on the existing dark/light toggle with zero re-render. The vendored bundle is shipped **gzip-compressed** at `vendor/beautiful-mermaid.min.js.gz.b64` (see `vendor/README.md` for provenance and the exact rebuild command) — built **once**, off-band; generating a page never runs a bundler or touches the network.
+
+**Why compressed:** the raw bundle is 1.56MB — embedded verbatim, that's added to EVERY generated page regardless of how many diagrams it has. Gzipped + base64'd it's **625KB** (measured: `gzip -9` → 468,777 bytes raw, → 625,037 bytes once base64'd for inline embedding — 40% of original). Decompressed client-side via `DecompressionStream('gzip')`, a browser-native API (Chrome/Edge 80+ 2020, Firefox 113+ 2021, Safari 16.4+ 2023 — ~95% global coverage), so this adds **zero** extra library weight. Brotli compresses smaller (364KB raw) but was rejected: cross-browser support for `DecompressionStream("brotli")` isn't reliably confirmed yet (MDN sources disagree) — gzip is the well-established, unambiguous choice for a skill that must render everywhere.
+
+**1. Assembly — embed the compressed vendor blob + a decompress-and-eval bootstrap.** When writing the output HTML file, splice the base64 text of `vendor/beautiful-mermaid.min.js.gz.b64` into a JS string constant, followed by this bootstrap (file-concat + one fixed snippet, not something to retype differently per page):
+
+```html
+<script>
+var __BM_GZ_B64 = "PASTE vendor/beautiful-mermaid.min.js.gz.b64 CONTENTS HERE, verbatim, no line breaks inside the string";
+window.__bmReady = (typeof DecompressionStream === 'undefined')
+  ? Promise.reject(new Error('DecompressionStream unsupported'))
+  : (async function(){
+      var bin = atob(__BM_GZ_B64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      var code = await new Response(stream).text();
+      (0, eval)(code); // indirect eval -> runs in global scope, defines window.BeautifulMermaid
+    })();
+</script>
+```
+
+This makes vendor loading **async** (decompression takes a tick) — `renderMermaidDiagram` below awaits `window.__bmReady` as its first line, so every call site must `await renderMermaidDiagram(...)` (or `.then()`), never call it expecting a synchronous return.
+
+**2. Theme tokens** — add these to the SAME `:root` / dark-override blocks already required by §Theme Toggle sáng/tối (mapped to this skill's real palette: text `#0f0f12`/`#4a4a55`, border `rgba(30,90,170,.14)`, accent `#0a84ff` — dòng 28-29, 103):
+
+Dùng ĐÚNG khuôn 4-rule đã định nghĩa ở §Theme Toggle (2 trong `@media` cho "hệ đang dark, user chưa chọn", 2 ngoài cho "user bấm chọn dark tường minh") — thiếu cặp trong `@media` thì diagram giữ theme sáng trong khi cả trang đã tối theo hệ, đúng lỗi nhỏ đã bắt được lúc viết đoạn này lần đầu:
+
+```css
+:root{
+  --mm-bg:#f7fbff; --mm-fg:#0f0f12; --mm-line:rgba(30,90,170,.45);
+  --mm-accent:#0a84ff; --mm-muted:#4a4a55; --mm-surface:rgba(255,255,255,.7);
+  --mm-border:rgba(30,90,170,.28);
+}
+@media (prefers-color-scheme: dark){
+  html:not([data-theme=light]){
+    --mm-bg:#0d1a2c; --mm-fg:#e8f0fb; --mm-line:rgba(120,160,220,.4);
+    --mm-accent:#5aa8ff; --mm-muted:#9fb4d1; --mm-surface:rgba(30,46,72,.7);
+    --mm-border:rgba(120,160,220,.32);
+  }
+}
+html[data-theme=dark]{ /* CÙNG token như trong @media ở trên */
+  --mm-bg:#0d1a2c; --mm-fg:#e8f0fb; --mm-line:rgba(120,160,220,.4);
+  --mm-accent:#5aa8ff; --mm-muted:#9fb4d1; --mm-surface:rgba(30,46,72,.7);
+  --mm-border:rgba(120,160,220,.32);
+}
+```
+
+**3. `.diagram-box`/`.diagram-viewport` markup is unchanged** from the hand-SVG path (same CSS, dòng 457-491) — the Mermaid path renders INTO the same containers. One addition: the wrapper div receiving `innerHTML` must have an explicit height, or the SVG's `height:100%` silently resolves to `auto` (real bug hit during PoC — CSS percentage-height needs a definite-height ancestor):
+
+```css
+.mm-out{height:100%;display:block}
+```
+
+**4. Render, theme-map, and Self-Contained fix** — call once per `.diagram-box` that crosses the complexity threshold:
+
+```js
+async function renderMermaidDiagram(container, dsl){
+  try { await window.__bmReady; }
+  catch (e){
+    // Graceful degradation (no DecompressionStream — pre-2020 Chrome/Edge, pre-2021
+    // Firefox, pre-16.4 Safari): explain instead of a silent blank box or a crash.
+    container.textContent = 'Sơ đồ này cần trình duyệt mới hơn (Chrome/Edge 80+, Firefox 113+, Safari 16.4+).';
+    return null;
+  }
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  var svg = BeautifulMermaid.renderMermaidSVG(dsl, {
+    bg: cssVar('--mm-bg'), fg: cssVar('--mm-fg'), accent: cssVar('--mm-accent'),
+    line: cssVar('--mm-line'), muted: cssVar('--mm-muted'),
+    surface: cssVar('--mm-surface'), border: cssVar('--mm-border')
+  });
+  // Self-Contained fix (CRITICAL, not optional): beautiful-mermaid hard-codes a
+  // Google Fonts @import into every SVG it returns, with no API to disable it.
+  // Strip it before inserting — font falls back to the system stack already
+  // declared right after 'Inter' in the same <style> block, so nothing breaks.
+  svg = svg.replace(/@import url\('https:\/\/fonts\.googleapis\.com[^;]+;/g, '');
+  container.innerHTML = svg;
+  var svgEl = container.querySelector('svg');
+  applyMermaidGlassStyling(svgEl);
+  initMermaidNodeDrag(svgEl);
+  return svgEl;
+}
+```
+
+Every call site becomes `await renderMermaidDiagram(container, dsl)` — wrap the page's diagram-init code in an `async function` (or top-level `(async()=>{...})()`), never call this expecting a synchronous SVG element back.
+
+**5. Glassmorphism post-processing (REQUIRED)** — beautiful-mermaid's default rendering is flat; this makes it match the rest of the page (rounded corners, soft blue drop-shadow, specular sheen — same recipe as `.diagram-box`/`.card`, never a fake `backdrop-filter` since SVG doesn't support it reliably) plus a subtle flowing-dash on edges for liveliness, reusing the exact `flowArrow` keyframe already defined above (§Key Animations) rather than inventing new vocabulary. **Never touches node/edge coordinates** — ELK.js already computed those; this only adds visual layers on top:
+
+```js
+function applyMermaidGlassStyling(svg){
+  var NS = 'http://www.w3.org/2000/svg';
+  var defs = svg.querySelector('defs');
+  if (!defs){ defs = document.createElementNS(NS,'defs'); svg.insertBefore(defs, svg.firstChild); }
+  var filter = document.createElementNS(NS,'filter');
+  filter.setAttribute('id','glass-shadow'); filter.setAttribute('x','-40%'); filter.setAttribute('y','-40%');
+  filter.setAttribute('width','180%'); filter.setAttribute('height','180%');
+  filter.innerHTML = '<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0a2a5c" flood-opacity="0.18"/>';
+  defs.appendChild(filter);
+  var sheen = document.createElementNS(NS,'linearGradient');
+  sheen.setAttribute('id','glass-sheen'); sheen.setAttribute('x1','0'); sheen.setAttribute('y1','0');
+  sheen.setAttribute('x2','1'); sheen.setAttribute('y2','1');
+  sheen.innerHTML = '<stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>'
+    + '<stop offset="45%" stop-color="#ffffff" stop-opacity="0.06"/>'
+    + '<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>';
+  defs.appendChild(sheen);
+  var style = document.createElementNS(NS,'style');
+  style.textContent = [
+    '.edge{stroke-dasharray:9 5;stroke-linecap:round;animation:flowArrow 1.9s linear infinite}',
+    '@media (prefers-reduced-motion:reduce){.edge{animation:none}}',
+    'g.node rect,g.node polygon{filter:url(#glass-shadow);transition:filter .18s ease}',
+    'g.node:hover rect,g.node:hover polygon{filter:url(#glass-shadow) brightness(1.04)}',
+    '.glass-sheen-ov{pointer-events:none}'
+  ].join('\n');
+  svg.appendChild(style);
+  svg.querySelectorAll('g.node').forEach(function(g){
+    var shape = g.querySelector('rect') || g.querySelector('polygon');
+    if (!shape) return;
+    var ov;
+    if (shape.tagName === 'rect'){
+      shape.setAttribute('rx','8'); shape.setAttribute('ry','8');
+      ov = document.createElementNS(NS,'rect');
+      ['x','y','width','height'].forEach(function(a){ ov.setAttribute(a, shape.getAttribute(a)); });
+      ov.setAttribute('rx','8'); ov.setAttribute('ry','8');
+    } else if (shape.tagName === 'polygon'){
+      ov = document.createElementNS(NS,'polygon'); ov.setAttribute('points', shape.getAttribute('points'));
+    } else { return; }
+    ov.setAttribute('fill','url(#glass-sheen)'); ov.setAttribute('class','glass-sheen-ov');
+    shape.insertAdjacentElement('afterend', ov);
+  });
+}
+```
+
+**6. Interactive layer — per-node drag with connector re-routing, wheel-zoom, NO background pan.** `beautiful-mermaid` emits `data-id` on every `g.node` and `data-from`/`data-to` on every `polyline.edge` natively — bind by that real id, never by a size heuristic. **User decision (200826): dragging empty canvas does NOTHING** — only individual nodes drag, and wheel still zooms. (The hand-SVG path above keeps its own background-pan-by-drag behavior unchanged; this decision applies only to the Mermaid path.)
+
+```js
+function initMermaidNodeDrag(svg){
+  var NS = 'http://www.w3.org/2000/svg';
+  var nodeState = {}, camera = { ptx:0, pty:0, scale:1 };
+  var nodeGroups = [].slice.call(svg.querySelectorAll('g.node'));
+  var edges = [].slice.call(svg.querySelectorAll('polyline.edge'));
+  nodeGroups.forEach(function(g){ nodeState[g.getAttribute('data-id')] = { tx:0, ty:0 }; g.style.cursor = 'move'; });
+  edges.forEach(function(e){
+    e._basePts = e.getAttribute('points').trim().split(/\s+/).map(function(pair){
+      var xy = pair.split(',').map(Number); return { x:xy[0], y:xy[1] };
+    });
+  });
+  function reroute(){
+    edges.forEach(function(e){
+      var pts = e._basePts.map(function(p){ return { x:p.x, y:p.y }; });
+      var from = nodeState[e.getAttribute('data-from')], to = nodeState[e.getAttribute('data-to')];
+      if (from){ pts[0].x += from.tx; pts[0].y += from.ty; }
+      if (to){ var last = pts[pts.length-1]; last.x += to.tx; last.y += to.ty; }
+      e.setAttribute('points', pts.map(function(p){ return p.x+','+p.y; }).join(' '));
+    });
+  }
+  function toSvgPoint(cx, cy){ var p = svg.createSVGPoint(); p.x = cx; p.y = cy; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+  function applyCamera(){ svg.style.transform = 'translate('+camera.ptx+'px,'+camera.pty+'px) scale('+camera.scale+')'; }
+  var vp = svg.closest('.diagram-viewport') || svg.parentElement;
+  var mode = null, dragId = null, start = null, t0 = null;
+  vp.onpointerdown = function(e){
+    var g = e.target.closest && e.target.closest('g.node');
+    if (!g) return;   // nền trống: KHÔNG làm gì (yêu cầu user 200826) — chỉ node mới bắt sự kiện
+    vp.setPointerCapture(e.pointerId);
+    mode = 'node'; dragId = g.getAttribute('data-id');
+    start = toSvgPoint(e.clientX, e.clientY); t0 = { x: nodeState[dragId].tx, y: nodeState[dragId].ty };
+  };
+  vp.onpointermove = function(e){
+    if (mode !== 'node') return;
+    var p = toSvgPoint(e.clientX, e.clientY), st = nodeState[dragId];
+    st.tx = t0.x + (p.x - start.x); st.ty = t0.y + (p.y - start.y);
+    svg.querySelector('g.node[data-id="'+dragId+'"]').setAttribute('transform', 'translate('+st.tx+','+st.ty+')');
+    reroute();
+  };
+  var endDrag = function(){ mode = null; dragId = null; };
+  vp.onpointerup = endDrag; vp.onpointercancel = endDrag;
+  vp.onwheel = function(e){
+    e.preventDefault();
+    var r = vp.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+    var ns = Math.min(4, Math.max(0.3, camera.scale*(e.deltaY<0?1.1:0.9)));
+    camera.ptx = mx-(mx-camera.ptx)*(ns/camera.scale); camera.pty = my-(my-camera.pty)*(ns/camera.scale);
+    camera.scale = ns; applyCamera();
+  };
+}
+```
+
+Verified end-to-end (Playwright/Chromium, not screenshots alone): 9-node branching diagram renders with correct ELK.js layout; per-node drag moves only that node and the bound edge's nearest endpoint follows it exactly (measured transform delta == mouse delta), sibling nodes stay at `transform:null`; background drag leaves the SVG's `transform` unchanged; wheel-zoom still works; theme toggle live-recolors the diagram via the CSS custom properties with no re-render.
+
 ### Copy Button on Code Panels (REQUIRED for every `pre.code-block`)
 
 Every code panel MUST have a hover-revealed Copy button. Capture `textContent` BEFORE injecting the button (so the button label isn't copied), wrap the `<pre>` in a relative `.code-wrap`, and copy via the Clipboard API with an `execCommand` fallback.
@@ -781,6 +975,8 @@ pre.code-block,.foot-tree{font-family:var(--font-mono)}
 
 ## Theme Toggle sáng/tối (REQUIRED — feedback user 2026-07-06, KHÔNG được ép một mode)
 
+**Liên quan §Navigation (trên, dòng ~161):** `.theme-row` bên dưới là con trực tiếp của `nav` đã dựng ở đó, và đọc lại biến `--nav-pad-y` khai cùng chỗ — không lặp lại CSS `nav` ở đây.
+
 Mọi trang sinh ra phải cho user TỰ CHỌN sáng/tối bằng một nút toggle — `prefers-color-scheme` chỉ là **mặc định ban đầu**, không phải quyết định cuối. Ép cứng dark (hoặc light) là vi phạm. Ba mảnh bắt buộc, không mảnh nào được thiếu:
 
 **1. CSS — dark là override theo token, viết MỘT lần dùng cho cả 2 ngả** (theo-hệ *khi user chưa chọn light*, và user-chọn-dark tường minh; light = base CSS nên không cần khối riêng):
@@ -803,10 +999,12 @@ if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)
 ```
 
 **3. NÚT GẠT (switch), KHÔNG phải chip icon rải góc** (feedback lần 3: chip 2 góc "không giống ai") — hàng footer **dính đáy sidebar/nav**: nhãn "Giao diện" bên trái + switch bên phải, vách ngăn mảnh phía trên. Track pill 50×26 có ☀️/🌙 hai đầu, knob trượt; `role="switch"` + `aria-checked` + Enter/Space toggle:
+
+⚠️ **Bài học 200826 — bug thật, không phải giả thuyết:** bản trước để `bottom:-<pad-nav>` là placeholder CHƯA resolve — LLM sinh trang phải tự đoán giá trị số khớp với padding của `nav` (§Navigation), quên/sai là nút gạt lệch khỏi đáy sidebar. Fix: đọc lại đúng biến `--nav-pad-y` đã khai ở `:root` trong §Navigation — KHÔNG hard-code lại số:
 ```css
-.theme-row{position:sticky;bottom:-<pad-nav>;margin-top:auto;display:flex;align-items:center;justify-content:space-between;
+.theme-row{position:sticky;bottom:calc(-1 * var(--nav-pad-y));margin-top:auto;display:flex;align-items:center;justify-content:space-between;
   padding:11px 16px;border-top:1px solid rgba(30,90,170,.14);background:…glass…;backdrop-filter:blur(14px)}
-.theme-switch .track{position:relative;width:50px;height:26px;border-radius:999px;…}
+.theme-switch .track{display:inline-block;position:relative;width:50px;height:26px;border-radius:999px;…}
 .theme-switch .track::before{content:'☀️';left:6px;…} .theme-switch .track::after{content:'🌙';right:6px;…}
 .theme-switch .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s}
 .theme-switch.on .knob{left:26px} .theme-switch.on .track{background:…dark…}
@@ -911,6 +1109,72 @@ nohup npx serve -p 8765 > /tmp/serve.log 2>&1 &
 Notify user: open `http://localhost:8765/llmwiki/html/DDMMYY-<file>.html`
 
 If port 8765 is already in use, skip (server already running).
+
+## Playwright Audit (REQUIRED — final step before handoff, run BEFORE telling the user it's ready)
+
+⚠️ **Bài học 200826, thật, không phải giả thuyết:** một trang được sinh ra để tự đọc code rồi làm ĐÚNG THEO SPEC (nút toggle dark/light, collapse sidebar) lại tự bị viết tắt sai — nút theme thành một chip nổi góc-trên-phải rời rạc, đúng anti-pattern chính SKILL.md này cấm (§Theme Toggle, "KHÔNG phải chip icon rải góc"), và sidebar không hề có `.nav-toggle`/`.nav-close`. Lỗi này KHÔNG bị bắt lúc sinh trang — chỉ lộ ra khi user tự mở trang và báo lại. Đọc code (hay đọc SKILL.md) không đủ để biết trang trông ra sao và có tương tác đúng không; phải MỞ THẬT bằng trình duyệt và ĐO, giống hệt kỷ luật đã áp cho mọi PoC trong phiên 200826.
+
+**Sau khi Auto-Host chạy, PHẢI verify bằng Playwright thật trước khi báo user trang đã xong.** Nếu không có sẵn `@playwright/test` trong project, cài theo `/playwright-verify` (skill riêng, đã có sẵn nếu framework này cài). Viết một script `.mjs` chạy thẳng bằng `node` (không qua `npx playwright test`), tối thiểu kiểm:
+
+1. **0 lỗi console/pageerror** khi trang load.
+2. **Nếu trang có `<nav>` sidebar**: `.nav-toggle` và `.nav-close` PHẢI tồn tại trong DOM (không phải suy đoán từ CSS — query DOM thật). Click `.nav-close` → `document.body` PHẢI có class `nav-collapsed` VÀ `.nav-toggle` PHẢI hiện (`opacity` khác 0). Click lại `.nav-toggle` → `nav-collapsed` PHẢI mất. Đây chính là round-trip đã KHÔNG được kiểm trong bài học 200826.
+3. **Nếu trang có theme toggle**: PHẢI là `.theme-row`/`.theme-switch` nằm bên trong `<nav>` (kiểm bằng `nav.contains(themeRowElement)`), KHÔNG phải một control `position:fixed` độc lập ở góc màn hình. Click toggle → `document.documentElement` đổi `data-theme`, chụp ảnh cả 2 theme.
+4. **Chụp ảnh tối thiểu 3 trạng thái**: theme sáng, theme tối, và (nếu có sidebar) sidebar đã đóng — lưu vào scratchpad, không cần giữ lại sau khi audit qua.
+
+```js
+import { chromium } from "@playwright/test";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+let errors = [];
+page.on("pageerror", e => errors.push(e.message));
+page.on("console", m => { if (m.type()==='error') errors.push(m.text()); });
+await page.goto("file://<đường-dẫn-tuyệt-đối-tới-file-vừa-sinh>.html", { waitUntil: "load" });
+await page.waitForTimeout(500);
+
+const hasNav = await page.evaluate(() => !!document.querySelector('nav'));
+if (hasNav) {
+  const dom = await page.evaluate(() => ({
+    hasToggle: !!document.querySelector('.nav-toggle'),
+    hasClose: !!document.querySelector('.nav-close'),
+  }));
+  if (!dom.hasToggle || !dom.hasClose) errors.push('THIẾU .nav-toggle/.nav-close — sidebar không đóng/mở được');
+  if (dom.hasClose) {
+    await page.click('.nav-close'); await page.waitForTimeout(300);
+    const collapsed = await page.evaluate(() => document.body.classList.contains('nav-collapsed'));
+    if (!collapsed) errors.push('Click .nav-close không collapse được sidebar');
+    await page.screenshot({ path: '/tmp/audit-collapsed.png' });
+    await page.click('.nav-toggle'); await page.waitForTimeout(300);
+  }
+}
+await page.screenshot({ path: '/tmp/audit-light.png' });
+
+// Dò control đổi theme bằng HÀNH VI thật (bấm thử), KHÔNG đoán theo tên
+// class/id — bug 200826 dùng class="toggle" (không chứa chữ "theme"), nên một
+// bộ dò theo tên class sẽ bỏ sót đúng case đã xảy ra thật. Bấm lần lượt mọi
+// control có thể bấm được tới khi data-theme đổi, rồi kiểm nó có nằm trong
+// .theme-row hay không — bất kể tên class/id của nó là gì.
+const themeBefore = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+// loại .nav-toggle/.nav-close khỏi ứng viên — chúng CŨNG là <button>, và bấm
+// nhầm .nav-close giữa vòng dò sẽ sập sidebar, khiến .theme-switch biến mất
+// khỏi tầm bấm cho các lần thử sau (bug thật gặp khi tự viết script này)
+const clickables = await page.$$('button:not(.nav-toggle):not(.nav-close), [role="switch"]');
+let themeCtl = null, inThemeRow = false;
+for (const el of clickables) {
+  await el.click().catch(() => {});
+  await page.waitForTimeout(150);
+  const themeAfter = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  if (themeAfter !== themeBefore) { themeCtl = el; inThemeRow = await el.evaluate(n => !!n.closest('.theme-row')); break; }
+}
+if (!themeCtl) errors.push('Bấm thử mọi <button>/[role=switch] không thấy data-theme đổi — thiếu theme toggle');
+else if (!inThemeRow) errors.push('Tìm thấy control đổi được data-theme nhưng KHÔNG nằm trong .theme-row — khả năng là chip nổi góc rời sidebar (bug 200826)');
+await page.screenshot({ path: '/tmp/audit-dark.png' });
+
+if (errors.length) { console.log('AUDIT FAIL:', errors); process.exit(1); }
+console.log('AUDIT PASS');
+await browser.close();
+```
+
+**Nếu audit FAIL: SỬA rồi audit lại — không báo trang đã xong ở trạng thái đỏ.** Đây là cổng chất lượng cuối cùng, tương đương `medic --ci` ở tầng code: đỏ thì đừng giao. Không cần giữ lại script hay ảnh chụp sau khi audit qua — đây là bước verify-rồi-vứt, không phải artifact phải commit (theo đúng quy ước `/playwright-verify`: "File script standalone không vào git — chạy từ scratchpad").
 
 ## Multi-File Mode
 

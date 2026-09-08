@@ -126,8 +126,9 @@ LOOP_GROUPS = {
         {"propose": "edit", "plan": "edit", "qc-code": "edit", "teach-me": "edit", "impact-check": "edit", "safe-change": "edit", "verify-before-commit": "edit",
          "build-now-adapt-later": "edit",
          "new-project-setup": "build", "onboard-codebase": "build", "new-skill": "build",
-         "skill-provenance": "build",
-         "wikieval": "eval", "ship": "eval", "loop-runner": "eval", "failure-flywheel": "eval"}),
+         "skill-provenance": "build", "doyourmagic": "build",
+         "wikieval": "eval", "ship": "eval", "loop-runner": "eval", "failure-flywheel": "eval",
+         "playwright-verify": "eval"}),
     "orchestrate": (
         [("dispatch", "🐳 điều phối"), ("eval", "📊 đánh giá"), ("ops", "🚀 vận hành & deploy")],
         {"orca-workflow": "dispatch", "orca-onboard": "dispatch", "orchestration": "dispatch",
@@ -144,7 +145,7 @@ LOOP_GROUPS = {
          "brandkit": "taste", "hallmark": "taste", "design-taste-frontend": "taste", "design-taste-frontend-v1": "taste",
          "gpt-taste": "taste", "high-end-visual-design": "taste", "stitch-design-taste": "taste",
          "minimalist-ui": "taste", "industrial-brutalist-ui": "taste", "redesign-existing-projects": "taste",
-         "cursor-animated-sites": "docs",
+         "cursor-animated-sites": "docs", "diagram": "docs",
          "image-to-code": "imagegen", "imagegen-frontend-mobile": "imagegen",
          "imagegen-frontend-web": "imagegen",
          "cavecrew": "caveman", "caveman": "caveman", "caveman-commit": "caveman", "caveman-compress": "caveman",
@@ -155,7 +156,7 @@ LOOP_GROUPS = {
          "check-approve": "utility", "computer-use": "utility", "find-skills": "utility",
          "full-output-enforcement": "utility", "join-project": "utility", "last30days": "utility",
          "raise-issue": "utility", "ovs-notes": "utility", "frontier-scan": "utility",
-         "uat-nonit-testcase": "utility", "fable5": "utility", "i-have-adhd": "utility"}),
+         "uat-nonit-testcase": "utility", "fable5": "utility", "graph-mode": "utility", "i-have-adhd": "utility"}),
 }
 
 
@@ -649,15 +650,20 @@ def sections(root: Path):
         "<li><b>retrieval-eval</b> chạy trong CI — chất lượng truy hồi không được tụt dưới sàn (tất định, không LLM).</li></ul></div></div>",
     ]))
 
-    _flow = [("agent định ghi", "#9aa4b2", ""), ("L0 · hook", "#0a84ff", "PreToolUse"),
-             ("L2 · pre-commit", "#5856d6", "fdk-gate"), ("L4 · CI", "#ff9500", "harness.yml (merge)"),
-             ("✓ vào main", "#34c759", "")]
-    _hsvg = ['<svg viewBox="0 0 900 165" xmlns="http://www.w3.org/2000/svg">'
+    # data-src = neo bằng chứng: node trỏ vào file THẬT làm ra tầng chặn đó. Cổng
+    # frontend-antipattern FAIL nếu đường dẫn không resolve → sơ đồ không nói dối được về code.
+    _flow = [("agent định ghi", "#9aa4b2", "", ""),
+             ("L0 · hook", "#0a84ff", "PreToolUse", "llmwiki/.claude/hooks/pre_tool_use.py"),
+             ("L2 · pre-commit", "#5856d6", "fdk-gate", "harness/scripts/fdk-gate.py"),
+             ("L4 · CI", "#ff9500", "harness.yml (merge)", ".github/workflows/harness.yml"),
+             ("✓ vào main", "#34c759", "", "")]
+    _hsvg = ['<svg role="img" viewBox="0 0 900 165" xmlns="http://www.w3.org/2000/svg"><title>bốn tầng chặn: agent định ghi → L0 hook → L2 pre-commit → L4 CI → vào main</title>'
              '<defs><marker id="arrH" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
              '<path d="M0,0 L9,4.5 L0,9 Z" fill="#9aa4b2"/></marker></defs>']
-    for _i, (_nm, _c, _sub) in enumerate(_flow):
+    for _i, (_nm, _c, _sub, _src) in enumerate(_flow):
         _x = 16 + _i * 180
-        _hsvg.append(f'<rect x="{_x}" y="46" width="152" height="52" rx="8" fill="rgba(255,255,255,.7)" stroke="{_c}" stroke-width="1.6"/>')
+        _ev = f' data-src="{_src}"' if _src else ""
+        _hsvg.append(f'<rect x="{_x}" y="46" width="152" height="52" rx="8" fill="rgba(255,255,255,.7)" stroke="{_c}" stroke-width="1.6"{_ev}/>')
         _hsvg.append(f'<text x="{_x + 76}" y="{68 if _sub else 76}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f0f12">{_nm}</text>')
         if _sub:
             _hsvg.append(f'<text x="{_x + 76}" y="86" text-anchor="middle" font-size="8.5" fill="#4a4a55">{_sub}</text>')
@@ -696,7 +702,7 @@ def sections(root: Path):
            ("gate", "#5856d6", "R7 đủ cặp .md+.html", "approved"),
            ("dispatch", "#30b0c7", "agent + CLI rẻ", "dispatched"),
            ("verify", "#34c759", "dispatch-verify + trace-grader", "done")]
-    _wsvg = ['<svg viewBox="0 0 900 150" xmlns="http://www.w3.org/2000/svg">'
+    _wsvg = ['<svg role="img" viewBox="0 0 900 150" xmlns="http://www.w3.org/2000/svg"><title>vòng orca-workflow: propose → gate → dispatch → verify</title>'
              '<defs><marker id="arrW" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
              '<path d="M0,0 L9,4.5 L0,9 Z" fill="#9aa4b2"/></marker></defs>']
     for _i, (_nm, _c, _mech, _state) in enumerate(_wf):
@@ -720,7 +726,7 @@ def sections(root: Path):
     ]))
 
     _agents = [("claude", "#0a84ff"), ("opencode", "#30b0c7"), ("agy/kiro", "#ff9500")]
-    _osvg = ['<svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg">'
+    _osvg = ['<svg role="img" viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg"><title>điều phối đa-agent: claude · opencode · agy/kiro cùng một hàng đợi task</title>'
              '<defs><marker id="arrO" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
              '<path d="M0,0 L9,4.5 L0,9 Z" fill="#9aa4b2"/></marker></defs>'
              '<rect x="18" y="76" width="150" height="48" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.6"/>'
@@ -752,7 +758,7 @@ def sections(root: Path):
         "<li>trace-grader chấm tool/thứ tự/pass^k — không chỉ kết quả.</li></ul></div></div>",
     ]))
 
-    _bsvg = ('<svg viewBox="0 0 900 190" xmlns="http://www.w3.org/2000/svg">'
+    _bsvg = ('<svg role="img" viewBox="0 0 900 190" xmlns="http://www.w3.org/2000/svg"><title>ba lớp gác hành vi đa-agent: orca_guard · dispatch-verify · trace-grader</title>'
              '<defs><marker id="arrB" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
              '<path d="M0,0 L9,4.5 L0,9 Z" fill="#9aa4b2"/></marker></defs>'
              '<rect x="16" y="68" width="140" height="52" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff9500" stroke-width="1.6"/>'
@@ -841,7 +847,7 @@ def sections(root: Path):
         ("4 · Quality", "#34c759", "code-health + fdk-gate", "STRONG", "ok"),
         ("5 · Audit", "#ff9500", "--audit hash-chain", "STRONG", "ok"),
     ]
-    _svg = ['<svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg">'
+    _svg = ['<svg role="img" viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg"><title>năm trụ overstack: Harness · Knowledge · Task · Quality · Audit</title>'
             '<defs><marker id="arrR" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
             '<path d="M0,0 L9,4.5 L0,9 Z" fill="#9aa4b2"/></marker></defs>'
             '<rect x="22" y="118" width="150" height="46" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.6"/>'
@@ -1108,14 +1114,63 @@ def main():
               f"fdk/tools/build-overstack-docs.py (1 lần), rồi auto-vào nhóm.", file=sys.stderr)
     if "--check" in sys.argv[1:]:
         cur = OUT.read_text(encoding="utf-8") if OUT.is_file() else ""
-        if cur.strip() != content.strip():
+        # Bỏ qua dòng self-path khi so: trang này NHÚNG wiki-graph, mà wiki-graph in đường dẫn
+        # TUYỆT ĐỐI của chính nó (luật R16 — người xem phải biết file nằm đâu). Đường đó khác
+        # nhau theo máy/worktree, nên so nguyên văn làm `--check` đỏ ở MỌI máy không phải máy
+        # sinh ra file — gate nói dối theo máy chứ không theo nội dung. Đo 2026-09-07: clone
+        # sạch của orca đỏ 1/21 chỉ vì 2 dòng path, nội dung y hệt (diff = 0 sau khi regen).
+        if _strip_selfpath(cur.strip()) != _strip_selfpath(content.strip()):
             print("[build-overstack-docs] overstack.html CŨ so với đĩa — chạy lại để cập nhật.", file=sys.stderr)
             sys.exit(2)
         print("overstack.html khớp đĩa ✓")
         sys.exit(0)
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(content, encoding="utf-8")
-    print(f"✓ wrote {OUT.relative_to(ROOT)} ({len(content)} bytes, {content.count(chr(10)) + 1} dòng)")
+    _deliver(OUT, content)
+
+
+# Trang này nhúng wiki-graph dưới dạng HTML ĐÃ ESCAPE (class=&quot;foot&quot;), nên phải nhận
+# cả hai kiểu dấu nháy — regex chỉ khớp `class="foot"` sẽ trượt sạch (đo: 0/2 khớp).
+_FOOT_PATH = re.compile(r'(<div class=(?:"|&quot;)foot(?:"|&quot;)><code>)[^<]*(</code></div>)')
+
+
+def _strip_selfpath(text: str) -> str:
+    """Thay đường dẫn tuyệt đối trong footer bằng placeholder — chỉ dùng để SO SÁNH, không ghi."""
+    return _FOOT_PATH.sub(r"\1<SELF-PATH>\2", text)
+
+
+def _deliver(out_path, content: str) -> None:
+    """Giao artifact NGUYÊN TỬ, giữ bản tốt cũ nếu bản mới hỏng.
+
+    Hấp thụ `deliver` của archify (09/2026): render vào một file tạm, KIỂM file tạm đó, chỉ
+    khi xanh mới `os.replace` — thao tác nguyên tử ở tầng filesystem. Bản mới hỏng thì file
+    đích giữ nguyên bản tốt trước đó, và người dùng biết CHÍNH XÁC vì sao.
+
+    Trước đây là `OUT.write_text(...)` ghi thẳng: một lỗi giữa chừng (đĩa đầy, generator sinh
+    HTML hỏng) là mất luôn bản tốt, và cổng frontend chỉ phát hiện SAU KHI file đã bị thay.
+    Đúng câu archify nói: không bao giờ nhả ra một artifact rác.
+
+    Cảnh báo mượn nguyên từ archify: sau một lần deliver ĐỎ, đừng đi soi file đích — bạn sẽ
+    soi bản tốt CŨ chứ không phải bản vừa hỏng. Bản hỏng nằm ở đường dẫn `.rejected` in ra.
+    """
+    import os
+    import subprocess
+
+    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    checker = ROOT / "fdk" / "tools" / "frontend-antipattern.py"
+    if checker.is_file():
+        r = subprocess.run([sys.executable, str(checker), str(tmp)],
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode == 1:                      # 1 = có FAIL (2 = chỉ WARN, vẫn giao)
+            rejected = out_path.with_suffix(out_path.suffix + ".rejected")
+            tmp.replace(rejected)
+            print(f"✗ KHÔNG giao: bản mới đỏ ở cổng frontend — {out_path.name} giữ nguyên "
+                  f"bản tốt cũ.\n  bản bị từ chối: {rejected}\n{r.stdout.strip()[-600:]}",
+                  file=sys.stderr)
+            sys.exit(1)
+    os.replace(tmp, out_path)                      # nguyên tử
+    print(f"✓ wrote {out_path.relative_to(ROOT)} ({len(content)} bytes, "
+          f"{content.count(chr(10)) + 1} dòng)")
 
 
 if __name__ == "__main__":

@@ -109,6 +109,61 @@ def p_docs():
     return "ok", f"{len(checks)} generator khớp đĩa", ""
 
 
+def p_wikisummary():
+    """index.md: cột Summary không được là ngày tháng trơ (vô dụng — ngày đã có sẵn trong tên
+    file). wiki-health.py ĐÃ có check này từ trước (global_shared, ship xuống mọi dự án khách)
+    nhưng chưa từng có gì gọi nó ở downstream — nằm đó không chặn ai. Probe này wire nó vào
+    thật, phạm vi HẸP CỐ Ý: chỉ 'summary', không bật broken/orphans/stale (nợ cũ project khác
+    có thể đỏ vì lý do không liên quan — quyết định bật rộng hơn để riêng, không lặng lẽ ở đây)."""
+    wh = ROOT / "harness/scripts/wiki-health.py"
+    wiki = ROOT / "llmwiki/wiki"
+    if not (wh.exists() and wiki.is_dir()):
+        return "skip", "thiếu wiki-health.py/llmwiki/wiki", ""
+    rc, out = sh([PY, str(wh), "--wiki-dir", "llmwiki/wiki", "--fail-on", "summary"], timeout=30)
+    try:
+        bad = json.loads(out).get("bare_date_summary", [])
+    except Exception:
+        return "skip", "wiki-health.py không trả JSON parse được", ""
+    if rc != 0 or bad:
+        sample = ", ".join(bad[:3])
+        return ("fail", f"{len(bad)} dòng index.md có Summary chỉ là ngày tháng: {sample}",
+                "đọc file liên kết rồi viết lại Summary thật (1 câu mô tả nội dung, không lặp ngày)")
+    return "ok", "mọi Summary trong index.md đều là mô tả thật", ""
+
+
+def p_handoff():
+    """Sổ BÀN GIAO giữa các node có nói dối không — state đang bay, trước nay 0 probe.
+
+    Bàn giao (run · message · inbox · reply) sống trong runtime Orca, không đi theo git;
+    `handoff-log.py` chép mốc ra repo. Probe này gác chính bản chép đó: mốc nào khai
+    `files_modified` / `report_path` mà đường dẫn không tồn tại là chuỗi đang kể chuyện
+    không kiểm chứng được. Cùng nguyên lý claim-receipts — đã khai thì phải đúng."""
+    chk = ROOT / "harness/scripts/handoff-log.py"
+    if not chk.exists():
+        return "skip", "chưa có handoff-log.py", ""
+    rc, out = sh([PY, str(chk), "--check"], timeout=60)
+    tail = next((ln.strip() for ln in reversed(out.splitlines()) if ln.strip()), "")
+    if rc == 1:
+        return "fail", tail or "sổ bàn giao khai sai", "python3 harness/scripts/handoff-log.py --check"
+    return "ok", tail or "sổ bàn giao sạch", ""
+
+
+def p_prose():
+    """AI-tell trong VĂN XUÔI người đọc (ADR/proposal/wiki) — chỗ p_frontend không với tới.
+
+    p_frontend gác HTML sinh; probe này gác GIỌNG của trang concept/entity. Toàn WARN có
+    chủ ý: chất lượng văn, không phải an toàn. Xem docstring prose-antipattern.py để biết
+    hai luật (em-dash, bold) đã bị LOẠI vì đo ra nhiễu 36%/42% trên corpus của ta."""
+    chk = ROOT / "fdk/tools/prose-antipattern.py"
+    if not chk.exists():
+        return "skip", "chưa có prose-antipattern.py", ""
+    rc, out = sh([PY, str(chk)], timeout=30)
+    tail = next((ln.strip() for ln in reversed(out.splitlines()) if ln.strip()), "")
+    if rc == 2:
+        return "warn", tail or "có AI-tell trong văn xuôi", "python3 fdk/tools/prose-antipattern.py"
+    return "ok", tail or "văn xuôi sạch AI-tell", ""
+
+
 def p_frontend():
     """Anti-pattern FRONTEND ở HTML sinh (ligature code, prose lọt code block) — p_docs không bắt."""
     chk = ROOT / "fdk/tools/frontend-antipattern.py"
@@ -134,10 +189,11 @@ def p_frontend():
 #   phải lỗi ngữ nghĩa (string không khớp).
 PROBE_MECH_MAP = {
     "rules": None, "coverage": None, "backstop": None, "docs": None, "frontend": None,
+    "prose": None, "handoff": None,
     "narrative": None, "foundation": None, "code": None, "eval": None, "freshinstall": None,
     "selfstate": "code-state", "capsurface": "capsurface",
     "capproof": "capproof", "provenance": "provenance-scope",
-    "orchestration": None, "deps": None,
+    "orchestration": None, "deps": None, "wikisummary": None,
 }
 
 
@@ -461,7 +517,10 @@ PROBES = [
     ("drift",    ["drift", "rules"],             lambda: p_rules()),  # drift lộ trong p_rules
     ("backstop", ["backstop", "git", "commit"],  p_backstop),
     ("docs",     ["docs", "capabilities"],       p_docs),
+    ("wikisummary", ["wikisummary", "docs", "index"], p_wikisummary),
     ("frontend", ["frontend", "docs", "html"],    p_frontend),
+    ("prose",    ["prose", "docs", "ai-tell", "giọng"], p_prose),
+    ("handoff",  ["handoff", "orchestration", "state", "bàn giao", "node"], p_handoff),
     ("narrative", ["narrative", "docs", "drift"], p_narrative),
     ("foundation", ["foundation", "docs", "drift"], p_foundation),
     ("selfstate", ["selfstate", "state", "narrative"], p_selfstate),

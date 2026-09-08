@@ -13,8 +13,16 @@ Schema (điều kiện hard-fail):
   field lạ            chỉ CẢNH BÁO, không fail (forward-compat)
 
 Dùng:
-  grounding-check.py --check FILE   # FILE = '-' đọc stdin; exit 0 hợp lệ, exit 2 + liệt kê lỗi
+  grounding-check.py --check FILE   # FILE = '-' đọc stdin
   grounding-check.py --self-test
+
+Exit code (BA giá trị PHÂN BIỆT — một cổng CI chỉ coi 0 là "đã chấm và hợp lệ"):
+  0 = verdict hợp lệ theo schema
+  2 = verdict ĐỌC ĐƯỢC nhưng schema sai (thiếu field / decision lạ / …)
+  3 = hạ tầng lỗi — KHÔNG đọc được FILE (chưa ai ghi verdict). Trước bản vá này, case
+      này trả về 0 giống hệt "hợp lệ", nên một cổng chỉ check `rc==0` không phân biệt
+      được "chưa ai chấm" với "đã chấm PASS" — gate coi như bị bypass bằng cách không
+      sinh output. KHÔNG dùng return 0 ở đây nữa.
 """
 import argparse
 import json
@@ -50,6 +58,36 @@ def min_evidence(root=None) -> int:
         return 0                                  # fail-open: không đọc được cấu hình thì không siết
 
 
+def _evidence_items_errs(items) -> list:
+    """R19: mỗi mục required_evidence[] phải là một ĐIỂM CUỐI, không phải một suy luận nữa.
+
+    Dùng CHUNG `evidence_leaf.check_leaf` với validator R19 — không có bộ luật thứ hai, hai bản
+    song song về cùng một khái niệm chắc chắn lệch nhau sau vài tháng.
+
+    TƯƠNG THÍCH NGƯỢC: hợp đồng cũ cho phép mục là CHUỖI TRẦN ("test A đỏ→xanh"), và
+    ge-integration-test.sh cùng verdict đã ghi đang dựa vào đó. Chuỗi trần không mang `kind` nên
+    không kiểm được — nó chỉ được CẢNH BÁO, không thành lỗi, cho tới khi R19 lật sang strict.
+    Mục dạng dict thì chịu luật thật ngay từ bây giờ.
+    """
+    errs = []
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "validators"))
+        import evidence_leaf
+    except Exception:                                  # fail-open: thiếu engine thì không siết
+        return errs
+    root = Path(__file__).resolve().parents[2]
+    for it in items:
+        if not isinstance(it, dict):
+            print(f"[grounding-check] R19 advisory: mục required_evidence là chuỗi trần "
+                  f"({str(it)[:60]!r}) — nên khai {{kind, evidence}} để kiểm được điểm cuối",
+                  file=sys.stderr)
+            continue
+        ok, why = evidence_leaf.check_leaf(it, root, {})
+        if not ok:
+            errs.append(f"required_evidence: mục không phải điểm cuối hợp lệ — {why}")
+    return errs
+
+
 def check_verdict(obj: dict, root=None) -> list:
     """Trả danh sách lỗi schema; [] = hợp lệ."""
     errs = []
@@ -72,6 +110,9 @@ def check_verdict(obj: dict, root=None) -> list:
         ev = obj.get("required_evidence")
         if not (isinstance(ev, list) and ev and all(str(x).strip() for x in ev)):
             errs.append("revise bắt buộc required_evidence[] >= 1 mục non-empty")
+    ev = obj.get("required_evidence")
+    if isinstance(ev, list) and ev:
+        errs += _evidence_items_errs(ev)
     return errs
 
 
@@ -110,9 +151,11 @@ def cmd_check(src: str) -> int:
         try:
             text = Path(src).read_text(encoding="utf-8")
         except OSError as e:
-            # hạ tầng lỗi (không đọc được file) → fail-open, không phá phiên
-            print(f"grounding-check: không đọc được {src} ({e}) — bỏ qua (fail-open)", file=sys.stderr)
-            return 0
+            # hạ tầng lỗi: KHÔNG trả 0 — 0 nghĩa là "verdict hợp lệ", và file thiếu nghĩa là
+            # chưa ai chấm gì cả. Một cổng CI chỉ check rc==0 phải phân biệt được 2 ca này,
+            # nếu không "quên ghi verdict" trở thành cách bypass gate không tốn công.
+            print(f"grounding-check: không đọc được {src} ({e}) — KHÔNG có verdict để chấm", file=sys.stderr)
+            return 3
     obj, errs = load_verdict(text)
     if obj is not None:
         errs = check_verdict(obj)
@@ -137,6 +180,16 @@ def self_test():
          '"required_evidence":["test qc-off-by-one-pagination chạy ĐỎ"]}', True),
         ("revise thiếu required_evidence",
          '{"decision":"revise","claim":"paginate() bỏ sót phần tử cuối","reason":"off-by-one ở paginate.py:42"}', False),
+        ("R19: required_evidence dạng điểm cuối hợp lệ",
+         '{"decision":"revise","claim":"c","reason":"r","required_evidence":'
+         '[{"kind":"observed","evidence":{"ref":"harness/policy.yaml"}}]}', True),
+        ("R19: required_evidence dạng điểm cuối HỎNG (web thiếu quote)",
+         '{"decision":"revise","claim":"c","reason":"r","required_evidence":'
+         '[{"kind":"web","evidence":{"url":"https://example.org/a","accessed":"2026-08-03"}}]}', False),
+        ("R19: mục 'web' đủ 3 trường thì qua",
+         '{"decision":"revise","claim":"c","reason":"r","required_evidence":'
+         '[{"kind":"web","evidence":{"url":"https://example.org/a#s1","accessed":"2026-08-03",'
+         '"quote":"trích nguyên văn"}}]}', True),
         ("decision lạ",
          '{"decision":"looks-good","claim":"ok","reason":"ok"}', False),
         ("claim rỗng",
@@ -184,6 +237,21 @@ def self_test():
     for label, passed in ev_cases:
         print(f"  {'✓' if passed else '✗'} {label}")
         ok = ok and passed
+
+    # ── bug thật đã tìm thấy: file verdict KHÔNG tồn tại từng trả rc=0, giống hệt hợp lệ ──
+    rc_missing = cmd_check("/nonexistent-verdict-file-xyz.json")
+    missing_ok = rc_missing == 3 and rc_missing != 0
+    print(f"  {'✓' if missing_ok else '✗'} file verdict thiếu → rc=3 (KHÔNG phải 0, không giả PASS)")
+    ok = ok and missing_ok
+
+    with tempfile.TemporaryDirectory() as td3:
+        valid_file = Path(td3) / "v.json"
+        valid_file.write_text('{"decision":"approve","claim":"c","reason":"r"}', encoding="utf-8")
+        rc_valid = cmd_check(str(valid_file))
+        three_way_ok = rc_valid == 0 and rc_missing == 3 and rc_valid != rc_missing
+        print(f"  {'✓' if three_way_ok else '✗'} 3 mã thoát phân biệt được nhau: hợp lệ=0, hạ tầng lỗi=3")
+        ok = ok and three_way_ok
+
     print("self-test: PASS" if ok else "self-test: FAIL")
     return 0 if ok else 1
 
