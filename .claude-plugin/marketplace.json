@@ -120,6 +120,13 @@
         "./skills/wiki-room",
         "./skills/wikieval"
       ]
+    },
+    {
+      "name": "overstack-budget-statusline",
+      "displayName": "Overstack Budget Statusline",
+      "description": "Status bar % trần token/$/model-call/tool-call của overstack + cửa sổ ngữ cảnh sống + mốc auto-handover",
+      "source": "./plugins/overstack-budget-statusline",
+      "license": "MIT"
     }
   ]
 }

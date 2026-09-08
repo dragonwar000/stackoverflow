@@ -1,0 +1,11 @@
+{
+  "name": "overstack-budget-statusline",
+  "displayName": "Overstack Budget Statusline",
+  "version": "0.1.0",
+  "description": "Status bar hiển thị % trần token/$/model-call/tool-call của overstack cộng cửa sổ ngữ cảnh sống, kèm mốc auto-handover.",
+  "author": { "name": "dragonwar000" },
+  "homepage": "https://github.com/dragonwar000/stackoverflow",
+  "license": "MIT",
+  "keywords": ["statusline", "token-budget", "overstack", "finops", "context-window"],
+  "commands": "./commands"
+}
