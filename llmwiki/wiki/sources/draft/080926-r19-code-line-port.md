@@ -41,7 +41,8 @@ Giải theo ranh giới *chi phí* chứ không theo bên nào:
 | Phần | Về đâu | Vì sao |
 |---|---|---|
 | 7 loại điểm cuối, kỷ luật `code-line`, `impl_ref`/`sdk_doc` | `skills/graph-mode/SKILL.md` | Đây là kỷ luật **trích dẫn** — buộc mở file/trích dẫn nhiều hơn mỗi câu trả lời, đúng thứ đã bị đưa ra opt-in |
-| Dòng `🔴 CẢNH BÁO SDK` | `CLAUDE.md` + `AGENT.md`, **luôn áp** | Đây là **nhãn cho người đọc**, không phải kỷ luật trích dẫn: giá bằng một dòng chữ, còn thứ nó chặn là người đọc tưởng nhầm kết luận rút từ mã nguồn trong khi nó rút từ tài liệu có thể đã cũ hoặc mô tả phiên bản khác |
+| Dòng `🔴 CẢNH BÁO SDK` (tầng CHAT) | `skills/graph-mode/SKILL.md` | Ban đầu tôi để nhãn này luôn-áp ở `CLAUDE.md` với lý do "giá một dòng chữ". User bác: mọi thứ khác đã ra opt-in thì nhãn cũng ra, `CLAUDE.md` chỉ giữ con trỏ. Đúng theo ADR-004 — ngoại lệ tự phong là cách một file auto-bơm phình lại |
+| Dòng `🔴 CẢNH BÁO SDK` (tầng TÀI LIỆU) | validator, **luôn cắn** | Không đổi: tài liệu có khối ```evidence-chain mà lá tựa `sdk_doc` thì thiếu nhãn là R19 CHẶN, bất kể graph-mode. Chỗ ghi lại được có cổng cứng; chỗ không validator nào với tới (chat) là kỷ luật bật khi cần |
 | Toàn bộ validator, fixture, policy, config, trang concept | Áp nguyên | Cổng máy chạy bất kể graph-mode bật hay tắt — không dính quyết định opt-in |
 
 Cách kỹ thuật: `git apply --3way` trên diff working-tree của họ. 10/12 file sạch; hai file
@@ -122,13 +123,15 @@ kiểm được) vẫn cắn.
 | `harness/evidence-terminal.config.yaml` | modified — ADAPT-CHECKLIST + trần đã biết |
 | `llmwiki/wiki/concepts/evidence-terminal-chain.md` | modified — 6→7 loại, mục cảnh báo đỏ |
 | `skills/graph-mode/SKILL.md` + mirror `llmwiki/skills/utils/graph-mode.md` | modified — **khác bản gốc**: kỷ luật trích dẫn về đây thay vì về CLAUDE.md |
-| `llmwiki/CLAUDE.md` · `llmwiki/AGENT.md` | modified — giữ khung opt-in, chỉ thêm nhãn `🔴 CẢNH BÁO SDK` luôn-áp |
+| `llmwiki/CLAUDE.md` · `llmwiki/AGENT.md` | modified — chỉ đổi "6 loại"→"7 loại"; khung opt-in giữ nguyên, KHÔNG chép luật ra ngoài |
 | `fdk/skills.provenance.json` | modified — ghi lại checksum `graph-mode` |
 
 ## Notes
 
 - Nguồn: `~/Documents/Development/harness/setup/llmwiki/wiki/draft/cave/080926-r19-code-line-sdk-warning.md` (phiên `57250149`, chưa commit ở checkout đó)
 - Bản này **không** chép nguyên tầng CHAT — xem bảng "Xung đột thiết kế" ở trên.
+- Vòng sửa sau phản hồi user: nhãn `🔴 CẢNH BÁO SDK` ở tầng CHAT chuyển nốt vào `/graph-mode`.
+  `CLAUDE.md`/`AGENT.md` trở lại đúng trạng thái trước đợt này, khác mỗi con số 6→7 loại.
 
 ## Origin
 

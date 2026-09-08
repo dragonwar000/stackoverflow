@@ -52,9 +52,14 @@ Bảy loại được tính là điểm cuối:
 **🔴 CẢNH BÁO SDK.** Kết luận về code tựa vào TÀI LIỆU SDK chứ không vào mã nguồn đọc được
 thì phải mở đầu bằng một dòng chứa `🔴 CẢNH BÁO SDK`, nói rõ hàm nào, gọi ở dòng nào, tài liệu
 nào chống lưng. Đọc tài liệu KHÁC đọc code: tài liệu có thể cũ, có thể mô tả phiên bản khác bản
-đang cài, có thể đúng chữ mà sai hành vi thật. Nhãn này áp cho CHAT **kể cả khi graph-mode
-tắt** — nó bảo vệ người đọc chứ không phải là kỷ luật trích dẫn, nên `llmwiki/CLAUDE.md` giữ
-nó ngoài cổng opt-in. Trong tài liệu có khối ```evidence-chain thì thiếu dòng này R19 chặn.
+đang cài, có thể đúng chữ mà sai hành vi thật — người đọc phải THẤY được sự khác nhau đó thay
+vì tự đoán.
+
+Nhãn này nằm **cùng cổng opt-in** với phần còn lại của skill: `llmwiki/CLAUDE.md` chỉ giữ con trỏ,
+không chép luật ra ngoài. Đổi lại, cổng MÁY vẫn cắn không phụ thuộc skill — tài liệu có khối
+```evidence-chain mà lá tựa `sdk_doc` thì thiếu dòng `🔴 CẢNH BÁO SDK` là R19 CHẶN, dù graph-mode
+đang tắt. Tức: chỗ ghi lại được (tài liệu) có cổng cứng, còn chỗ không validator nào với tới
+(chat) là kỷ luật bật khi cần.
 
 Không kết luận bằng "rõ ràng là", "ai cũng biết", hay bằng cách trỏ ngược về một mục
 lập luận khác trong cùng câu trả lời. Chi tiết cơ chế: [[evidence-terminal-chain]].
