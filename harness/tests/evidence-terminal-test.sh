@@ -162,6 +162,24 @@ cchain "$CL_IMPL" '    ref: "app.py:10"
   && ok "code-line: loi goi ham NOI BO + impl_ref tro dung dinh nghia → qua" \
   || bad "code-line impl_ref dung" "bi bat nham"
 
+# LIVENESS cua nhanh doi chieu — cong cam nguy hiem hon cong do.
+# Do 2026-09-08: `_repo_defines` shell ra `grep -E` voi mot pattern PCRE (`(?:...)`). BSD grep
+# (macOS) nuot duoc nen local xanh; GNU grep (Linux/CI) tra rc=2 -> ham tra None -> nhanh
+# "khai sdk_doc cho ham CO trong repo" chet cam tren MOI may Linux ma test khac khong thay.
+# Rao nay doi mot cau tra loi DUT KHOAT (True/False), khong chap None.
+LIVE=$(python3 - "$SRC" "$CODEROOT" <<'PYLIVE'
+import importlib.util, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("el", Path(sys.argv[1]) / "harness/validators/evidence_leaf.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+r = Path(sys.argv[2])
+print("OK" if m._repo_defines("helper", r) is True and m._repo_defines("connect", r) is False else "DEAD")
+PYLIVE
+)
+[ "$LIVE" = "OK" ] \
+  && ok "doi chieu repo-defines CON SONG (True/False dut khoat, khong phai None)" \
+  || bad "repo-defines cam" "tra None/sai — nhanh sdk_doc-cho-ham-noi-bo se khong bao gio bat"
+
 CL_IMPLBAD="$TMP/cl-implbad.md"
 cchain "$CL_IMPLBAD" '    ref: "app.py:10"
     callee: "helper"

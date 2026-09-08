@@ -6,6 +6,7 @@ de dung CHUNG mot bo luat diem cuoi. Hai ban luat song song ve cung mot khai nie
 lech nhau sau vai thang, nen o day chi co MOT ban.
 """
 import importlib.util
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -139,20 +140,75 @@ def _repo_defines(name: str, root: Path):
 
     None la mot trang thai RIENG, khong duoc tron vao False: "khong tim duoc" khac "chac chan
     khong co". Cho nay chi dung de DOI CHIEU voi khai bao cua tac gia, nen None = bo qua doi chieu,
-    con cong chinh (phai khai impl_ref hoac sdk_doc) van can."""
+    con cong chinh (phai khai impl_ref hoac sdk_doc) van can.
+
+    Quet bang `re` cua PYTHON, KHONG shell ra `grep -E`. Ly do do duoc 2026-09-08: pattern duoi
+    day la PCRE (`(?:...)`), ma `grep -E` an ERE. BSD grep (macOS) nuot duoc nen local xanh; GNU
+    grep (Linux/CI) tra rc=2 "Invalid preceding regular expression" -> ham nay tra None -> nhanh
+    doi chieu "khai sdk_doc cho ham CO trong repo" CHET CAM tren Linux ma khong ai thay. Chay
+    regex trong Python bo han van de phuong ngu regex, va giu duoc dung mot ban pattern.
+    """
     n = re.escape(name)
-    pat = (rf"(?:def|class|func|function|fn|sub|interface|struct|trait|enum|type)\s+{n}\b"
-           rf"|\b{n}\s*[:=]\s*(?:async\s*)?(?:function\b|\()"
-           rf"|\b(?:const|let|var|val)\s+{n}\s*="
-           rf"|\b{n}\s*\([^;]*\)\s*\{{")
-    for cmd in (["git", "grep", "-lIE", pat, "--"], ["grep", "-rlIE", pat, "."]):
+    try:
+        rx = re.compile(
+            rf"(?:def|class|func|function|fn|sub|interface|struct|trait|enum|type)\s+{n}\b"
+            rf"|\b{n}\s*[:=]\s*(?:async\s*)?(?:function\b|\()"
+            rf"|\b(?:const|let|var|val)\s+{n}\s*="
+            rf"|\b{n}\s*\([^;]*\)\s*\{{")
+    except re.error:
+        return None
+
+    files = _candidate_files(root)
+    if files is None:
+        return None
+    for f in files:
         try:
-            p = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, timeout=20)
-        except Exception:  # noqa: BLE001 — git/grep vang mat hoac treo: thu cach ke tiep
+            if f.stat().st_size > _SCAN_MAX_BYTES:
+                continue
+            if rx.search(f.read_text(encoding="utf-8", errors="ignore")):
+                return True
+        except OSError:
             continue
-        if p.returncode in (0, 1):
-            return bool(p.stdout.strip())
-    return None
+    return False
+
+
+# Tran quet: du rong cho repo that, du hep de khong bien mot validator thanh mot vong quet dia.
+_SCAN_MAX_FILES = 20000
+_SCAN_MAX_BYTES = 2_000_000
+_SKIP_DIRS = frozenset({
+    ".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".next",
+    "target", "vendor", ".mypy_cache", ".pytest_cache", ".tox", ".gradle", "coverage",
+})
+
+
+def _candidate_files(root: Path):
+    """File nguon de quet. Uu tien `git ls-files` (chi file duoc track); khong phai repo thi di bo.
+
+    Tra None khi khong liet ke duoc gi ca — de goi y giu duoc trang thai "khong tra duoc".
+    """
+    try:
+        p = subprocess.run(["git", "ls-files", "-z"], cwd=str(root),
+                           capture_output=True, text=True, timeout=20)
+        if p.returncode == 0 and p.stdout:
+            out = [root / x for x in p.stdout.split("\0") if x]
+            if out:
+                return out[:_SCAN_MAX_FILES]
+    except Exception:  # noqa: BLE001 — git vang mat / treo / khong phai repo: di bo thu muc
+        pass
+    out, n = [], 0
+    try:
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
+            for fn in filenames:
+                if Path(fn).suffix.lower() not in CODE_EXT:
+                    continue
+                out.append(Path(dirpath) / fn)
+                n += 1
+                if n >= _SCAN_MAX_FILES:
+                    return out
+    except OSError:
+        return out or None
+    return out
 
 
 def _read_anchor(root: Path, ref: str):

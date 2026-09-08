@@ -72,6 +72,34 @@ Một lần đầu ca `observed` trỏ `.py` báo *không chặn* — hoá ra fi
 backtick), không phải lỗ luật. Dựng lại bằng heredoc thì chặn đúng. Ghi lại vì đây là kiểu kết
 luận sai dễ mắc nhất khi bite-test: fixture hỏng trông y hệt luật thủng.
 
+## Lỗi phương ngữ regex — luật hụt trên Linux, local không thấy
+
+CI đỏ đúng **một** ca mà local xanh 21/21: `code-line sdk cho ham noi bo — LOT`.
+
+`_repo_defines` (nhánh đối chiếu "hàm này có định nghĩa trong repo không") shell ra
+`grep -E` với một pattern viết bằng cú pháp **PCRE** — `(?:...)`. Nhưng `-E` ăn **ERE**, mà ERE
+không có `(?:`. BSD grep trên macOS nuốt được nên local xanh; GNU grep trên Linux/CI trả
+`rc=2 Invalid preceding regular expression`, mà hàm chỉ chấp `rc ∈ {0,1}` nên rơi xuống
+`return None` — và `None` nghĩa là "bỏ qua đối chiếu".
+
+Hệ quả lớn hơn một test đỏ: nhánh "khai `sdk_doc` cho hàm CÓ định nghĩa trong repo → lỗi"
+**chết câm trên mọi máy Linux**, kể cả khi chạy trên repo thật. Không ai thấy, vì cổng câm
+không đỏ.
+
+Sửa: quét bằng `re` của **Python**, không shell ra `grep` nữa — pattern vốn được viết bằng cú
+pháp Python (`re.escape`, `(?:`), nên chạy nó bằng chính engine đó là bỏ hẳn vấn đề phương ngữ.
+Liệt kê file bằng `git ls-files` khi có, không phải repo thì đi bộ thư mục với danh sách bỏ qua
+và trần 20 000 file / 2 MB mỗi file.
+
+Neo lại bằng một assertion **liveness**, vì đây đúng là kiểu lỗi mà cổng câm không bắt được:
+`_repo_defines` phải trả lời **dứt khoát** `True`/`False` cho hai ca đã biết, `None` là đỏ.
+Negative control: ép `_candidate_files` trả `None` → test tụt 22/22 xuống 19/21, bắt đúng cả
+assertion liveness lẫn ca `sdk_doc`-cho-hàm-nội-bộ.
+
+Bài học lặp lại được: **local xanh trên macOS không chứng minh gì về Linux** khi cổng nào đó
+shell ra công cụ hệ thống. Chỗ đáng nghi là mọi lần `subprocess` gọi `grep`/`sed`/`awk` với
+regex.
+
 ## Trần đã biết (chép nguyên từ bản gốc, đã đọc code xác nhận)
 
 Bộ dò lời gọi đọc **một dòng văn bản**, không dựng AST — bỏ chuỗi/comment trước khi đếm, nhận
