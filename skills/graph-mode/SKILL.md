@@ -1,6 +1,6 @@
 ---
 name: graph-mode
-description: Bật luật chứng cứ evidence-chain (R19) cho phần CHAT — bắt buộc mọi chuỗi lập luận chấm dứt ở chứng cứ xem được (observed/tool-record/graph-edge/web/parametric/absence), khác fable5 (kỷ luật suy luận chung, không ràng buộc trích dẫn). Dùng khi user nói 'graph-mode', 'bật graph mode', 'evidence mode', hoặc invoke /graph-mode. Nặng token (buộc trích dẫn/mở file nhiều hơn mỗi câu trả lời) nên KHÔNG auto-bơm mỗi phiên — chỉ bật khi gọi tay. Once invoked it stays active for the rest of the session (toggle off with 'tắt graph mode' / 'graph-mode off' / 'normal mode').
+description: Bật luật chứng cứ evidence-chain (R19) cho phần CHAT — bắt buộc mọi chuỗi lập luận chấm dứt ở chứng cứ xem được (observed/code-line/tool-record/graph-edge/web/parametric/absence), khác fable5 (kỷ luật suy luận chung, không ràng buộc trích dẫn). Dùng khi user nói 'graph-mode', 'bật graph mode', 'evidence mode', hoặc invoke /graph-mode. Nặng token (buộc trích dẫn/mở file nhiều hơn mỗi câu trả lời) nên KHÔNG auto-bơm mỗi phiên — chỉ bật khi gọi tay. Once invoked it stays active for the rest of the session (toggle off with 'tắt graph mode' / 'graph-mode off' / 'normal mode').
 ---
 
 # Skill: graph-mode
@@ -27,8 +27,18 @@ Khi bật, mọi chuỗi lập luận trong CHAT phải chấm dứt ở chứng
 phải một lập luận nữa. Chuỗi `A vì B vì chứng cứ C` là xong; chuỗi `A vì B vì C` mà C
 lại là suy luận thì CHƯA xong — phải khai tiếp C dựa trên cái gì, cho tới khi chạm đáy.
 
-Sáu loại được tính là điểm cuối:
-- `observed` — đường dẫn `file:line` mở ra được, hoặc lệnh chạy lại được kèm output.
+Bảy loại được tính là điểm cuối:
+- `observed` — đường dẫn mở ra được, hoặc lệnh chạy lại được kèm output. **KHÔNG dùng cho
+  file mã nguồn** — code đi lối `code-line` dưới đây, nếu không thì đổi một chữ `kind` là né
+  được toàn bộ kỷ luật neo-dòng.
+- `code-line` — kết luận về CODE: neo vào `path/file.ext:LINE` mở ra được. Dòng neo **không
+  được chỉ là một lời gọi hàm** — `connect(url)` không chứng minh `connect` làm gì, nó chỉ
+  chứng minh có ai đó gọi nó. Dòng neo là lời gọi thì phải khai tiếp đúng một trong hai:
+  `impl_ref` — dòng ĐỊNH NGHĨA của hàm đó trong source; hoặc `sdk_doc` — hàm nằm trong
+  SDK/thư viện, không có trong source, nên phải TRA TÀI LIỆU của SDK đó (url tuyệt đối trỏ
+  đúng mục + ngày tra + trích nguyên văn). Khai cả hai là lỗi; khai `sdk_doc` cho hàm mà
+  `git grep` tìm thấy định nghĩa trong repo cũng là lỗi — đang đọc mô tả thay vì đọc code
+  đang chạy.
 - `tool-record` — id một mục trong provenance-log / events.jsonl / ledger.
 - `graph-edge` — eid một cạnh trong wiki graph.
 - `web` — dữ liệu tìm trên mạng: phải kèm **link tới ĐÚNG CHỖ tìm được** (không phải
@@ -38,6 +48,13 @@ Sáu loại được tính là điểm cuối:
   KHÔNG được là điểm cuối duy nhất của một kết luận dùng để quyết định — phải nâng lên
   `web`/`observed` hoặc đi kèm loại khác.
 - `absence` — chính lệnh/truy vấn đã chạy để tìm, kèm output rỗng của nó.
+
+**🔴 CẢNH BÁO SDK.** Kết luận về code tựa vào TÀI LIỆU SDK chứ không vào mã nguồn đọc được
+thì phải mở đầu bằng một dòng chứa `🔴 CẢNH BÁO SDK`, nói rõ hàm nào, gọi ở dòng nào, tài liệu
+nào chống lưng. Đọc tài liệu KHÁC đọc code: tài liệu có thể cũ, có thể mô tả phiên bản khác bản
+đang cài, có thể đúng chữ mà sai hành vi thật. Nhãn này áp cho CHAT **kể cả khi graph-mode
+tắt** — nó bảo vệ người đọc chứ không phải là kỷ luật trích dẫn, nên `llmwiki/CLAUDE.md` giữ
+nó ngoài cổng opt-in. Trong tài liệu có khối ```evidence-chain thì thiếu dòng này R19 chặn.
 
 Không kết luận bằng "rõ ràng là", "ai cũng biết", hay bằng cách trỏ ngược về một mục
 lập luận khác trong cùng câu trả lời. Chi tiết cơ chế: [[evidence-terminal-chain]].

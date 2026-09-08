@@ -22,12 +22,19 @@ Trước khi sửa hay xây bất cứ thứ gì, hỏi **"vì sao"** cho tới 
 
 ## Chứng cứ trong CHAT — opt-in qua `/graph-mode`, không auto-bơm mỗi phiên
 
-Luật chuỗi-lập-luận-phải-chạm-chứng-cứ (6 loại điểm cuối, chi tiết [[evidence-terminal-chain]])
+Luật chuỗi-lập-luận-phải-chạm-chứng-cứ (7 loại điểm cuối, chi tiết [[evidence-terminal-chain]])
 GIỜ nằm ở `skills/graph-mode/SKILL.md`, không còn bơm mặc định vào mọi phiên — kỷ luật này buộc
 trích dẫn/mở file nhiều hơn mỗi câu trả lời (nặng token), nên chỉ bật khi thật cần độ tin cậy cao
 (audit, ADR, chẩn đoán lan rộng). Gọi `/graph-mode` để bật, "tắt graph mode"/"normal mode" để tắt.
 Validator máy trên tài liệu ```evidence-chain (R19, `harness/validators/evidence_terminal.py`) KHÔNG
 phụ thuộc skill này — luôn chạy qua `harness/policy.yaml` bất kể graph-mode bật hay tắt.
+
+**🔴 CẢNH BÁO SDK — LUÔN áp, kể cả khi graph-mode tắt.** Khi một kết luận về code tựa vào TÀI LIỆU
+SDK/thư viện chứ không vào mã nguồn đọc được, phải mở đầu kết luận đó bằng một dòng chứa
+`🔴 CẢNH BÁO SDK`, nói rõ hàm nào, gọi ở dòng nào, tài liệu nào chống lưng. Đây là nhãn cho NGƯỜI
+ĐỌC, không phải kỷ luật trích dẫn, nên không nằm sau cổng opt-in: tài liệu có thể cũ, có thể mô tả
+phiên bản khác bản đang cài, có thể đúng chữ mà sai hành vi thật — người đọc phải THẤY được sự khác
+nhau đó thay vì tự đoán. Trong tài liệu có khối ```evidence-chain, thiếu dòng này thì R19 chặn.
 
 ## Cái thang chống over-engineering — chạy khi VIẾT/SỬA code
 Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponytail, MIT — nguồn `060726-ponytail-distill`.)
