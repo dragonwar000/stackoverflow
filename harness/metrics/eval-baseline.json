@@ -1,12 +1,12 @@
 {
   "schema": "wikieval-baseline/v1",
   "generated_by": "harness/scripts/wikieval.py",
-  "generated_at": "2026-07-18",
+  "generated_at": "2026-09-08",
   "evals_dir": "fdk/wiki/sources/evals",
   "summary": {
-    "goldens": 4,
-    "decided": 4,
-    "passed": 4
+    "goldens": 7,
+    "decided": 7,
+    "passed": 7
   },
   "goldens": {
     "adapt-modes-pick": {
@@ -19,6 +19,16 @@
         "regex:(?i)(dissolve|hòa tan)"
       ]
     },
+    "artifact-selfpath-relative": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:tương đối",
+        "regex:(?i)(drift|cộng dồn|tích lu)",
+        "regex:(?i)(r16|footer|self-?path)"
+      ]
+    },
     "capproof-liveness": {
       "pass": true,
       "score": 1.0,
@@ -27,6 +37,28 @@
         "icontains:unproven",
         "regex:(?i)(capproof|bằng chứng)",
         "regex:(?i)ratchet|nợ"
+      ]
+    },
+    "merge-fork-identity": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "contains:REPO_RAW",
+        "icontains:định danh",
+        "regex:(?i)ours/theirs",
+        "regex:(?i)(grep|diff)"
+      ]
+    },
+    "merge-superset-conflict": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:superset",
+        "contains:egress-guard",
+        "regex:(?i)(đo trước|diff)",
+        "regex:(?i)(không mất|mất 0)"
       ]
     },
     "r2-origin": {

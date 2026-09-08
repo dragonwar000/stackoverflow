@@ -1,4 +1,9 @@
 {
   "r2-origin": "Theo rule R2, mọi file nội dung wiki phải có section '## Origin' để luôn truy được nguồn gốc.",
-  "sql-active-users": "SELECT * FROM users WHERE active = true;"
+  "sql-active-users": "SELECT * FROM users WHERE active = true;",
+  "merge-fork-identity": "Không lấy ours/theirs cho cả file. Trong hunk đó upstream đổi cấu trúc đường dẫn còn fork đổi dòng ĐỊNH DANH REPO_RAW — lấy phần cấu trúc của upstream, giữ REPO_RAW và SKILLS_REF của fork. Nghiệm thu: grep lại năm file trên đường cài, rồi diff cây merge với upstream, phần chênh phải đúng bằng danh sách file định danh đã chốt trước khi merge.",
+  "merge-superset-conflict": "Đo trước rồi mới chọn: diff hai bản với nhau chứ không đọc hai nửa hunk. Với egress-guard.py bản upstream là superset của bản fork — có cả fix thu phạm vi lẫn lớp lọc bare_ok — nên lấy trọn upstream và khẳng định được mất 0 dòng. Nếu hai bên không bao nhau thì hợp nhất tay.",
+  "adapt-modes-pick": "Có ba kiểu absorb: HÒA TAN (dissolve — chưng cất ý rồi viết lại thành của mình), KÉO NGOÀI (external-pull — pin phiên bản + provenance, engine vẫn nằm ngoài), và NHÚNG-SỞ-HỮU (vendor bytes vào repo). Bản chất nhỏ gọn, muốn gác tất định, không muốn dependency ngoài → chọn HÒA TAN.",
+  "capproof-liveness": "CAPABILITIES.md map từng năng lực sang một bằng chứng chạy được (resolver sáu tầng: proof: trong frontmatter > rule-map harness-doctor > harness/tests > --self-test > golden > medic). Năng lực không có bằng chứng nào rơi vào mục UNPROVEN. Probe capproof của medic gác kiểu ratchet: nợ đã nằm trong baseline thì chỉ đếm, còn năng lực MỚI mà thiếu proof hoặc proof cũ bị mất thì đỏ.",
+  "artifact-selfpath-relative": "Không. Artifact đã commit phải nhúng đường TƯƠNG ĐỐI theo repo — R16 chỉ cần người xem biết file nằm đâu, và path tuyệt đối làm file drift theo máy: mỗi phiên regen ở worktree khác lại đổi footer, với trang gom nhiều nguồn thì path còn cộng dồn thay vì ghi đè. Vá ở tầng so sánh (--check bỏ qua self-path) chỉ chữa gate; sửa gốc là ghi tương đối ngay lúc render."
 }

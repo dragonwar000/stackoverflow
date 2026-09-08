@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merge upstream setup@orca vào fork stackoverflow</title>
+<meta name="description" content="Đợt merge 106 commit từ Rheinmir/setup@orca vào fork dragonwar000/stackoverflow ngày 08/09/2026 — ba xung đột giải theo bằng chứng, đối chiếu CI tại local, hai golden eval mới.">
+<meta name="theme-color" content="#eaf2fd">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a84ff'/%3E%3Cpath d='M9 22V10m0 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm14-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 0v2a4 4 0 0 1-4 4h-6' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>(function(){try{var t=localStorage.getItem("merge080926-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}})();</script>
+<style>
+:root{
+  --font-text:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue','Roboto','Segoe UI',sans-serif;
+  --font-display:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue','Roboto','Segoe UI',sans-serif;
+  --font-mono:'SF Mono',ui-monospace,'SFMono-Regular',Menlo,'Roboto Mono',Consolas,monospace;
+  --glass-1:rgba(255,255,255,.55);
+  --glass-2:rgba(255,255,255,.7);
+  --glass-3:rgba(255,255,255,.88);
+  --blur-1:24px;--blur-2:8px;--blur-3:4px;
+  --edge-hi:inset 0 1px 0 rgba(255,255,255,.85);
+  --border:rgba(30,90,170,.14);
+  --ink:#0f0f12;--ink2:#4a4a55;
+  --code-bg:#12161f;
+}
+*{box-sizing:border-box}
+html{background:#e9f0fb;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:transparent transparent}
+html.scrolling{scrollbar-color:rgba(10,132,255,.32) transparent}
+body{margin:0;padding-left:200px;font-family:var(--font-text);font-size:13px;line-height:1.62;color:var(--ink);
+  background:
+    radial-gradient(900px 500px at 12% -10%,rgba(10,132,255,.10),transparent 60%),
+    radial-gradient(700px 420px at 95% 15%,rgba(90,162,232,.08),transparent 55%),
+    linear-gradient(180deg,#f7fbff 0%,#eaf2fd 100%);
+  transition:padding-left .28s cubic-bezier(.4,0,.2,1)}
+body::before{content:'';position:fixed;inset:-10%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(640px 440px at 10% 14%,rgba(10,132,255,.22),transparent 65%),
+    radial-gradient(380px 460px at 4% 52%,rgba(48,176,199,.18),transparent 65%),
+    radial-gradient(540px 400px at 88% 10%,rgba(88,86,214,.13),transparent 60%),
+    radial-gradient(720px 500px at 74% 76%,rgba(48,176,199,.13),transparent 65%),
+    radial-gradient(480px 380px at 16% 86%,rgba(255,149,0,.12),transparent 60%);
+  animation:orbDrift 46s ease-in-out infinite alternate}
+@keyframes orbDrift{100%{transform:translate(2.2%,1.6%) scale(1.045)}}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:radial-gradient(rgba(30,90,170,.11) 1px,transparent 1.3px);
+  background-size:22px 22px;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.22));
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.22))}
+a{color:#0a84ff;text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3,.logo{font-family:var(--font-display);letter-spacing:-.02em;text-wrap:balance}
+p{text-wrap:pretty}
+:focus-visible{outline:2px solid #0a84ff;outline-offset:2px;border-radius:8px}
+:focus:not(:focus-visible){outline:none}
+table,.diagram-box text,.mm .node .ct{font-variant-numeric:tabular-nums}
+
+/* ── scrollbar overlay ── */
+::-webkit-scrollbar{width:11px;height:11px;background:transparent}
+::-webkit-scrollbar-track,::-webkit-scrollbar-track-piece,::-webkit-scrollbar-corner,::-webkit-scrollbar-button{background:transparent;border:0;box-shadow:none}
+::-webkit-scrollbar-thumb{background:transparent;border-radius:8px;border:3px solid transparent;background-clip:content-box;transition:background-color .25s ease}
+html.scrolling::-webkit-scrollbar-thumb,::-webkit-scrollbar-thumb:hover{background-color:rgba(10,132,255,.32)}
+::-webkit-scrollbar-thumb:active{background-color:rgba(10,132,255,.6)}
+
+/* ── skip link ── */
+.skip-link{position:fixed;top:8px;left:8px;z-index:200;padding:8px 14px;border-radius:10px;font-size:12px;
+  background:var(--glass-1);backdrop-filter:blur(var(--blur-1));-webkit-backdrop-filter:blur(var(--blur-1));
+  border:1px solid var(--border);transform:translateY(-150%);transition:transform .2s}
+.skip-link:focus-visible{transform:translateY(0)}
+
+/* ── sidebar ── */
+nav{position:fixed;top:0;left:0;bottom:0;width:200px;z-index:100;
+  display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:18px 12px;
+  overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;
+  background:linear-gradient(165deg,rgba(255,255,255,.46) 0%,rgba(255,255,255,.22) 48%,rgba(240,248,255,.34) 100%);
+  backdrop-filter:blur(var(--blur-1)) saturate(1.7) brightness(1.04);
+  -webkit-backdrop-filter:blur(var(--blur-1)) saturate(1.7) brightness(1.04);
+  border-right:1px solid rgba(255,255,255,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 1px 0 0 rgba(255,255,255,.5),
+    inset -1px 0 0 rgba(30,90,170,.10),4px 0 24px rgba(30,90,170,.08);
+  transition:transform .28s cubic-bezier(.4,0,.2,1)}
+nav::-webkit-scrollbar{width:0;height:0;display:none}
+nav>*{flex-shrink:0;position:relative}
+nav::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(220px 160px at 18% 4%,rgba(255,255,255,.55),transparent 70%),
+    linear-gradient(115deg,rgba(255,255,255,.28) 0%,transparent 28%,transparent 72%,rgba(255,255,255,.14) 100%)}
+nav .logo{margin:0 0 12px;padding:6px 10px;font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#0a84ff,#64b5f7);-webkit-background-clip:text;background-clip:text;color:transparent}
+nav .logo .ic{background:linear-gradient(135deg,#0a84ff,#64b5f7)}
+nav a{padding:5px 10px;border-radius:10px;font-size:12px;color:var(--ink2);position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:9px;transition:background .15s,color .15s}
+nav a:hover{text-decoration:none;color:var(--ink)}
+nav a.active{color:#0a84ff;background:rgba(10,132,255,.08);font-weight:600}
+nav a .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex-shrink:0}
+nav a .ic svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav a:nth-of-type(1) .ic{background:linear-gradient(135deg,#0a84ff,#5aa2e8)}
+nav a:nth-of-type(2) .ic{background:linear-gradient(135deg,#30b0c7,#5ecfe0)}
+nav a:nth-of-type(3) .ic{background:linear-gradient(135deg,#5856d6,#8b8aef)}
+nav a:nth-of-type(4) .ic{background:linear-gradient(135deg,#34c759,#5fd97c)}
+nav a:nth-of-type(5) .ic{background:linear-gradient(135deg,#ff9500,#ffb545)}
+nav a:nth-of-type(6) .ic{background:linear-gradient(135deg,#ff2d55,#ff6b86)}
+body.nav-collapsed nav{transform:translateX(-100%)}
+body.nav-collapsed{padding-left:0}
+.nav-toggle{position:fixed;top:12px;left:12px;z-index:120;width:32px;height:32px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ink2);cursor:pointer;
+  background:linear-gradient(165deg,rgba(255,255,255,.5),rgba(255,255,255,.24));
+  backdrop-filter:blur(var(--blur-1)) saturate(1.7) brightness(1.04);
+  -webkit-backdrop-filter:blur(var(--blur-1)) saturate(1.7) brightness(1.04);
+  border:1px solid transparent;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 0 0 1px rgba(30,90,170,.08),0 2px 10px rgba(30,90,170,.12);
+  transition:opacity .2s,transform .28s cubic-bezier(.4,0,.2,1)}
+.nav-toggle:hover{color:#0a84ff}
+body:not(.nav-collapsed) .nav-toggle{opacity:0;pointer-events:none;transform:translateX(-6px)}
+.nav-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--ink2);cursor:pointer;
+  background:rgba(0,0,0,.04);border:none;overflow:hidden}
+.nav-close:hover{color:#0a84ff;background:rgba(10,132,255,.10)}
+.theme-row{position:sticky;bottom:-18px;margin-top:auto;display:flex;align-items:center;justify-content:space-between;
+  padding:11px 12px;border-top:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.42),rgba(255,255,255,.26));
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.theme-row .lbl{font-size:11.5px;color:var(--ink2)}
+.theme-switch{cursor:pointer}
+.theme-switch .track{position:relative;display:block;width:50px;height:26px;border-radius:999px;
+  background:rgba(30,90,170,.14);box-shadow:inset 0 1px 3px rgba(20,40,90,.18);transition:background .2s}
+.theme-switch .track::before{content:'☀️';position:absolute;left:6px;top:5px;font-size:10px;line-height:1}
+.theme-switch .track::after{content:'🌙';position:absolute;right:6px;top:5px;font-size:10px;line-height:1}
+.theme-switch .knob{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 4px rgba(20,40,90,.3);transition:left .18s cubic-bezier(.4,0,.2,1);z-index:1}
+.theme-switch.on .knob{left:26px}
+.theme-switch.on .track{background:rgba(10,132,255,.55)}
+
+/* ── ripple ── */
+.ripple-ink{position:absolute;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.70) 0%,rgba(255,255,255,.28) 38%,rgba(10,132,255,.20) 72%,transparent 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -10px 20px rgba(10,132,255,.12),0 0 14px rgba(10,132,255,.10);
+  backdrop-filter:blur(2px) saturate(1.25);-webkit-backdrop-filter:blur(2px) saturate(1.25);
+  transform:scale(0);opacity:1;animation:rippleGrow .6s cubic-bezier(.25,.46,.45,.94) forwards}
+@keyframes rippleGrow{55%{transform:scale(1);opacity:.75}100%{transform:scale(1.04);opacity:0}}
+.ripple{position:absolute;border-radius:50%;pointer-events:none;transform:scale(0);opacity:.9;
+  background:radial-gradient(circle,rgba(255,255,255,.6) 0%,rgba(10,132,255,.22) 35%,transparent 70%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.45);
+  animation:rippleWave .65s cubic-bezier(.2,.6,.3,1) forwards}
+@keyframes rippleWave{to{transform:scale(2.8);opacity:0}}
+
+/* ── hero ── */
+.hero{max-width:1100px;margin:0 auto;padding:76px 24px 26px}
+.hero .eyebrow{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:4px 11px;border-radius:999px;background:rgba(10,132,255,.10);color:#0a84ff;margin-bottom:14px}
+.hero h1{font-size:clamp(26px,4vw,40px);margin:0 0 12px;line-height:1.12;
+  background:linear-gradient(135deg,#0a84ff,#5aa2e8,#cfe3fb);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lead{font-size:14px;color:var(--ink2);max-width:74ch;margin:0}
+.hero .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.hero .meta span{font-size:10.5px;padding:4px 10px;border-radius:8px;background:var(--glass-2);
+  backdrop-filter:blur(var(--blur-2));border:1px solid var(--border);box-shadow:var(--edge-hi);color:var(--ink2);
+  font-family:var(--font-mono)}
+
+/* ── repo card ── */
+.repo-card{max-width:1052px;width:calc(100% - 48px);margin:8px auto 0;border-radius:16px;overflow:hidden;
+  background:var(--glass-2);backdrop-filter:blur(var(--blur-2)) saturate(1.1);-webkit-backdrop-filter:blur(var(--blur-2)) saturate(1.1);
+  border:1px solid var(--border);box-shadow:var(--edge-hi),0 4px 20px rgba(20,40,90,.08)}
+.chrome{display:flex;align-items:center;gap:7px;padding:9px 13px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.14))}
+.chrome .url-bar{flex:1;margin-left:8px;font-family:var(--font-mono);font-size:10.5px;color:var(--ink2);
+  background:rgba(30,90,170,.06);border-radius:7px;padding:3px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-body{padding:16px 18px 22px;font-size:12.5px;color:var(--ink2);display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.rc-body b{display:block;color:var(--ink);font-size:12px;margin-bottom:3px}
+.rc-body code{font-family:var(--font-mono);font-size:11px}
+
+/* ── sections ── */
+/* full-bleed tint dùng 100vw, mà body có padding-left cho sidebar → dải tràn quá mép phải.
+   Clip ở tầng main: đúng bằng vùng nhìn thấy bên phải sidebar, và không tạo scroll container
+   (fallback hidden cho browser chưa hiểu clip). */
+main{overflow-x:hidden;overflow-x:clip}
+.section-bg{position:relative;overflow:visible}
+.section-bg::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:100vw;transform:translateX(-50%);pointer-events:none}
+section{padding:64px 24px 72px;max-width:1100px;margin:0 auto;position:relative;scroll-margin-top:24px}
+.section-header{position:relative;z-index:1;margin-bottom:6px}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:999px;margin-bottom:10px}
+.section-header h2{font-size:21px;margin:0 0 8px;color:#1d1d1f}
+.section-header p{font-size:13.5px;color:var(--ink2);max-width:78ch;margin:0}
+.content-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0;position:relative;z-index:1}
+.card{background:var(--glass-2);backdrop-filter:blur(var(--blur-2)) saturate(1.1);-webkit-backdrop-filter:blur(var(--blur-2)) saturate(1.1);
+  border:1px solid var(--border);border-radius:16px;box-shadow:var(--edge-hi),0 4px 20px rgba(20,40,90,.08);padding:20px}
+.card h4{margin:0 0 10px;font-size:12.5px;font-weight:700;letter-spacing:-.01em}
+.card p{margin:0 0 10px;font-size:12.5px;color:var(--ink2)}
+.card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.card li{font-size:12.5px;color:var(--ink2);padding-left:15px;position:relative}
+.card li::before{content:'›';position:absolute;left:0;font-weight:700}
+.card code,.section-header code,p code,td code,li code{font-family:var(--font-mono);font-size:11.5px;
+  background:rgba(30,90,170,.07);padding:1px 5px;border-radius:5px}
+.table-wrap{overflow-x:auto;margin:22px 0;position:relative;z-index:1;border-radius:14px;
+  border:1px solid var(--border);box-shadow:var(--edge-hi),0 4px 20px rgba(20,40,90,.06)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;
+  background:var(--glass-3);backdrop-filter:blur(var(--blur-3));-webkit-backdrop-filter:blur(var(--blur-3))}
+th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink2);
+  padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid rgba(30,90,170,.07);color:var(--ink2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td b{color:var(--ink)}
+.sec-foot{font-size:11.5px;color:var(--ink2);position:relative;z-index:1;margin-top:6px}
+.sec-foot code{font-family:var(--font-mono)}
+
+/* ── diagram ── */
+.diagram-box{background:var(--glass-2);backdrop-filter:blur(var(--blur-2)) saturate(1.1);-webkit-backdrop-filter:blur(var(--blur-2)) saturate(1.1);
+  border:1px solid var(--border);border-radius:16px;box-shadow:var(--edge-hi),0 4px 20px rgba(20,40,90,.08);
+  padding:24px;margin:24px 0;position:relative;overflow:hidden;display:flex;flex-direction:column;
+  resize:vertical;min-height:190px;transition:box-shadow .2s ease;z-index:1}
+.diagram-box:hover{box-shadow:var(--edge-hi),0 6px 28px rgba(20,40,90,.14)}
+.diagram-viewport{position:relative;flex:1 1 auto;width:100%;overflow:hidden;cursor:grab;touch-action:none}
+.diagram-viewport.grabbing{cursor:grabbing}
+.diagram-viewport svg{width:100%;height:auto;display:block;overflow:visible;transform-origin:0 0;will-change:transform;user-select:none;-webkit-user-select:none}
+.dnode{cursor:move}
+.dnode>rect{transition:filter .15s ease}
+.dnode:hover>rect:first-of-type{filter:drop-shadow(0 3px 8px rgba(0,0,0,.18))}
+.diagram-hint{position:absolute;top:8px;right:12px;z-index:5;font-size:10px;color:var(--ink2);
+  background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.05);border-radius:20px;padding:3px 10px;
+  white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+.diagram-box:hover .diagram-hint{opacity:.9}
+.diagram-reset{position:absolute;bottom:8px;right:10px;z-index:5;font-size:11px;
+  background:rgba(255,255,255,.85);border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:3px 9px;
+  cursor:pointer;color:var(--ink2);opacity:0;transition:opacity .2s;overflow:hidden}
+.diagram-box:hover .diagram-reset{opacity:1}
+.diagram-reset:hover{background:#fff;color:var(--ink)}
+.diagram-box::after{content:'';position:absolute;right:5px;bottom:5px;width:16px;height:16px;pointer-events:none;
+  opacity:0;transition:opacity .25s ease;clip-path:polygon(100% 0,100% 100%,0 100%);
+  background:repeating-linear-gradient(135deg,transparent 0 3.5px,rgba(10,132,255,.45) 3.5px 5px)}
+.diagram-box:hover::after{opacity:.85}
+.diagram-box::-webkit-resizer{display:none}
+@keyframes flowArrow{0%{stroke-dashoffset:20}100%{stroke-dashoffset:0}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+/* ── code ── */
+pre.code-block{background:var(--code-bg);color:#dbe4f0;border-radius:12px;padding:14px 16px;margin:0;
+  font-family:var(--font-mono);font-size:11.5px;line-height:1.65;overflow-x:auto;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 18px rgba(20,40,90,.14)}
+pre.code-block .c{color:#7d8aa0}
+pre.code-block .k{color:#7cc4ff}
+pre.code-block .g{color:#6ee7a8}
+pre.code-block .r{color:#ff8b9a}
+.code-wrap{position:relative;margin:14px 0}
+.code-copy{position:absolute;top:7px;right:7px;z-index:2;width:28px;height:26px;display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.1);color:#cbd5e1;border:1px solid rgba(255,255,255,.15);border-radius:7px;
+  cursor:pointer;opacity:0;transition:opacity .15s,background .15s,color .15s;overflow:hidden}
+.code-copy svg{width:14px;height:14px;display:block}
+.code-wrap:hover .code-copy{opacity:1}
+.code-copy:hover{background:rgba(255,255,255,.2);color:#fff}
+.code-copy.copied{background:rgba(16,185,129,.25);color:#6ee7b7;border-color:rgba(16,185,129,.45);opacity:1}
+@media(max-width:640px){.code-copy{opacity:1}}
+
+/* ── checklist ── */
+.checklist{list-style:none;display:flex;flex-direction:column;gap:8px;margin:0;padding:0}
+.checklist li{display:flex;align-items:flex-start;gap:10px;font-size:12.5px;color:var(--ink2);cursor:pointer;padding-left:0}
+.checklist li::before{display:none}
+.checklist input[type="checkbox"]{width:16px;height:16px;border-radius:4px;border:1.5px solid #cbd5e1;
+  appearance:none;-webkit-appearance:none;cursor:pointer;flex-shrink:0;background:rgba(255,255,255,.8);margin-top:2px;transition:all .15s}
+.checklist input[type="checkbox"]:checked{background:#0a84ff;border-color:#0a84ff;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M13 4L6.5 11 3 7.5' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-size:contain}
+.checklist label{cursor:pointer;line-height:1.5}
+.checklist input[type="checkbox"]:checked+label{text-decoration:line-through;color:#94a3b8}
+
+/* ── collapse ── */
+.collapse-toggle{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-text);font-size:12.5px;font-weight:600;
+  color:var(--ink);background:var(--glass-2);backdrop-filter:blur(var(--blur-2));-webkit-backdrop-filter:blur(var(--blur-2));
+  border:1px solid var(--border);border-radius:12px;padding:9px 14px;cursor:pointer;position:relative;overflow:hidden;
+  box-shadow:var(--edge-hi),0 2px 10px rgba(20,40,90,.06)}
+.collapse-toggle .arrow{transition:transform .25s cubic-bezier(.4,0,.2,1);font-size:10px;color:var(--ink2)}
+.collapse-toggle .arrow.open{transform:rotate(90deg)}
+.collapse-body{max-height:0;overflow:hidden;opacity:0;transition:max-height .35s cubic-bezier(.4,0,.2,1),opacity .25s ease}
+.collapse-body.open{opacity:1}
+.collapse-body-inner{padding-top:14px}
+
+/* ── mind map ── */
+.mm{overflow-x:auto;padding:14px 24px 6px;max-width:1100px;margin:0 auto}
+.mm-canvas{position:relative;width:max-content}
+.mm-links{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:0}
+.mm-links path{fill:none;stroke-width:2.2;opacity:.55;stroke-linecap:round}
+.mm .tree{position:relative;z-index:1}
+.mm .tree,.mm .children{display:flex;flex-direction:column;gap:9px;justify-content:center}
+.mm .row{display:flex;align-items:center;gap:48px;position:relative}
+.mm .children{position:relative}
+.mm .children.collapsed{display:none}
+.mm .node{position:relative;display:inline-flex;flex-direction:column;gap:1px;padding:7px 13px;border-radius:13px;
+  cursor:default;white-space:nowrap;background:rgba(255,255,255,.72);backdrop-filter:blur(7px) saturate(1.1);
+  -webkit-backdrop-filter:blur(7px) saturate(1.1);border:1px solid var(--border);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 3px 14px rgba(20,40,90,.07);transition:transform .12s}
+.mm .node.has-children{cursor:pointer}
+.mm .node:hover{transform:translateY(-1px)}
+.mm .node .nm{font-size:13px;font-weight:700;letter-spacing:-.01em}
+.mm .node .ds{font-size:10.5px;color:var(--ink2)}
+.mm .node .ct{font-size:10px;color:#fff;font-weight:700;padding:1px 7px;border-radius:999px;position:absolute;top:-8px;right:-8px;background:#0a84ff}
+.mm .node.has-children::after{content:'';position:absolute;right:-7px;top:50%;width:6px;height:6px;
+  border-right:2px solid var(--ink2);border-bottom:2px solid var(--ink2);transform:translateY(-50%) rotate(-45deg);opacity:.5}
+.mm .node.collapsed-parent::after{transform:translateY(-50%) rotate(45deg)}
+.mm .node.root{background:linear-gradient(135deg,rgba(10,132,255,.16),rgba(88,86,214,.14));border-color:rgba(10,132,255,.4)}
+.mm .node.b-0 .nm{color:#30b0c7}.mm .node.b-0{border-color:rgba(48,176,199,.35)}.mm .node.b-0 .ct{background:#30b0c7}
+.mm .node.b-1 .nm{color:#5856d6}.mm .node.b-1{border-color:rgba(88,86,214,.35)}.mm .node.b-1 .ct{background:#5856d6}
+.mm .node.b-2 .nm{color:#f08c00}.mm .node.b-2{border-color:rgba(255,149,0,.35)}.mm .node.b-2 .ct{background:#ff9500}
+.mm .node.b-3 .nm{color:#28a745}.mm .node.b-3{border-color:rgba(52,199,89,.35)}.mm .node.b-3 .ct{background:#34c759}
+.mm .node.b-4 .nm{color:#e0264b}.mm .node.b-4{border-color:rgba(255,45,85,.35)}.mm .node.b-4 .ct{background:#ff2d55}
+
+/* ── section accents ── */
+#sec-0 .tag{background:rgba(10,132,255,.12);color:#0a84ff}
+#sec-0 .card h4{color:#0a84ff}#sec-0 .card li::before{color:#0a84ff}
+.s-bg0::before{background:linear-gradient(180deg,rgba(10,132,255,.05) 0%,transparent 60%)}
+#sec-1 .tag{background:rgba(48,176,199,.12);color:#30b0c7}
+#sec-1 .card h4{color:#30b0c7}#sec-1 .card li::before{color:#30b0c7}
+.s-bg1::before{background:linear-gradient(180deg,rgba(48,176,199,.05) 0%,transparent 60%)}
+#sec-2 .tag{background:rgba(88,86,214,.12);color:#5856d6}
+#sec-2 .card h4{color:#5856d6}#sec-2 .card li::before{color:#5856d6}
+.s-bg2::before{background:linear-gradient(180deg,rgba(88,86,214,.05) 0%,transparent 60%)}
+#sec-3 .tag{background:rgba(52,199,89,.12);color:#28a745}
+#sec-3 .card h4{color:#28a745}#sec-3 .card li::before{color:#28a745}
+.s-bg3::before{background:linear-gradient(180deg,rgba(52,199,89,.05) 0%,transparent 60%)}
+#sec-4 .tag{background:rgba(255,149,0,.12);color:#f08c00}
+#sec-4 .card h4{color:#f08c00}#sec-4 .card li::before{color:#f08c00}
+.s-bg4::before{background:linear-gradient(180deg,rgba(255,149,0,.06) 0%,transparent 60%)}
+#sec-5 .tag{background:rgba(255,45,85,.12);color:#e0264b}
+#sec-5 .card h4{color:#e0264b}#sec-5 .card li::before{color:#e0264b}
+.s-bg5::before{background:linear-gradient(180deg,rgba(255,45,85,.05) 0%,transparent 60%)}
+.section-header h2{color:#1d1d1f}
+
+footer{max-width:1100px;margin:0 auto;padding:40px 24px 60px;font-size:11.5px;color:var(--ink2);
+  border-top:1px solid var(--border)}
+footer code{font-family:var(--font-mono)}
+.foot-tree{font-family:var(--font-mono);font-size:11px;margin-top:8px;color:var(--ink2)}
+
+@media(max-width:760px){.content-grid{grid-template-columns:1fr}}
+@media(max-width:640px){
+  body{padding-left:0}
+  nav{box-shadow:0 8px 30px rgba(0,0,0,.14)}
+  .hero{padding-top:60px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
+
+/* ══ DARK — theo hệ khi user chưa chọn light ══ */
+@media (prefers-color-scheme: dark){
+  html:not([data-theme=light]){--glass-1:rgba(32,40,58,.55);--glass-2:rgba(26,33,49,.68);--glass-3:rgba(21,27,41,.88);
+    --border:rgba(120,160,220,.18);--ink:#e8ecf4;--ink2:#a3aec2;--edge-hi:inset 0 1px 0 rgba(255,255,255,.10);
+    --code-bg:#0a0d14;background:#0c0f16}
+  html:not([data-theme=light]) body{color:var(--ink);
+    background:radial-gradient(900px 500px at 12% -10%,rgba(10,132,255,.14),transparent 60%),
+      radial-gradient(700px 420px at 95% 15%,rgba(88,86,214,.12),transparent 55%),
+      linear-gradient(180deg,#0e131d 0%,#0a0e16 100%)}
+  html:not([data-theme=light]) body::after{background-image:radial-gradient(rgba(150,190,255,.10) 1px,transparent 1.3px)}
+  html:not([data-theme=light]) nav{background:linear-gradient(165deg,rgba(40,50,72,.55) 0%,rgba(24,31,46,.34) 48%,rgba(30,40,60,.46) 100%);
+    border-right:1px solid rgba(140,175,230,.16);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 1px 0 0 rgba(255,255,255,.06),inset -1px 0 0 rgba(0,0,0,.3),4px 0 24px rgba(0,0,0,.35)}
+  html:not([data-theme=light]) nav::before{background:radial-gradient(220px 160px at 18% 4%,rgba(255,255,255,.10),transparent 70%),
+    linear-gradient(115deg,rgba(255,255,255,.06) 0%,transparent 28%,transparent 72%,rgba(255,255,255,.04) 100%)}
+  html:not([data-theme=light]) .section-header h2{color:#f2f5fa}
+  html:not([data-theme=light]) .card code,html:not([data-theme=light]) p code,html:not([data-theme=light]) td code,
+  html:not([data-theme=light]) li code,html:not([data-theme=light]) .section-header code{background:rgba(140,175,230,.13)}
+  html:not([data-theme=light]) .mm .node{background:rgba(30,38,56,.75)}
+  html:not([data-theme=light]) .diagram-hint,html:not([data-theme=light]) .diagram-reset{background:rgba(26,33,49,.85);color:var(--ink2);border-color:rgba(140,175,230,.18)}
+  html:not([data-theme=light]) .chrome{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02))}
+  html:not([data-theme=light]) .chrome .url-bar{background:rgba(140,175,230,.10)}
+  html:not([data-theme=light]) .nav-close{background:rgba(255,255,255,.06)}
+  html:not([data-theme=light]) .theme-switch .track{background:rgba(140,175,230,.20)}
+  html:not([data-theme=light]) .checklist input[type=checkbox]{background:rgba(140,175,230,.10);border-color:rgba(140,175,230,.35)}
+  html:not([data-theme=light]) .nav-toggle{background:linear-gradient(165deg,rgba(40,50,72,.6),rgba(24,31,46,.4));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 0 1px rgba(140,175,230,.12),0 2px 10px rgba(0,0,0,.4)}
+  html:not([data-theme=light]) .diagram-box svg rect[fill^="rgba(255,255,255"]{fill:rgba(255,255,255,.055)}
+  html:not([data-theme=light]) .diagram-box svg text[fill="#4a4a55"]{fill:#c6cede}
+  html:not([data-theme=light]) .diagram-box svg text[fill="#7d8aa0"]{fill:#94a1b8}
+}
+/* ══ DARK — user chọn tường minh ══ */
+html[data-theme=dark]{--glass-1:rgba(32,40,58,.55);--glass-2:rgba(26,33,49,.68);--glass-3:rgba(21,27,41,.88);
+  --border:rgba(120,160,220,.18);--ink:#e8ecf4;--ink2:#a3aec2;--edge-hi:inset 0 1px 0 rgba(255,255,255,.10);
+  --code-bg:#0a0d14;background:#0c0f16}
+html[data-theme=dark] body{color:var(--ink);
+  background:radial-gradient(900px 500px at 12% -10%,rgba(10,132,255,.14),transparent 60%),
+    radial-gradient(700px 420px at 95% 15%,rgba(88,86,214,.12),transparent 55%),
+    linear-gradient(180deg,#0e131d 0%,#0a0e16 100%)}
+html[data-theme=dark] body::after{background-image:radial-gradient(rgba(150,190,255,.10) 1px,transparent 1.3px)}
+html[data-theme=dark] nav{background:linear-gradient(165deg,rgba(40,50,72,.55) 0%,rgba(24,31,46,.34) 48%,rgba(30,40,60,.46) 100%);
+  border-right:1px solid rgba(140,175,230,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 1px 0 0 rgba(255,255,255,.06),inset -1px 0 0 rgba(0,0,0,.3),4px 0 24px rgba(0,0,0,.35)}
+html[data-theme=dark] nav::before{background:radial-gradient(220px 160px at 18% 4%,rgba(255,255,255,.10),transparent 70%),
+  linear-gradient(115deg,rgba(255,255,255,.06) 0%,transparent 28%,transparent 72%,rgba(255,255,255,.04) 100%)}
+html[data-theme=dark] .section-header h2{color:#f2f5fa}
+html[data-theme=dark] .card code,html[data-theme=dark] p code,html[data-theme=dark] td code,
+html[data-theme=dark] li code,html[data-theme=dark] .section-header code{background:rgba(140,175,230,.13)}
+html[data-theme=dark] .mm .node{background:rgba(30,38,56,.75)}
+html[data-theme=dark] .diagram-hint,html[data-theme=dark] .diagram-reset{background:rgba(26,33,49,.85);color:var(--ink2);border-color:rgba(140,175,230,.18)}
+html[data-theme=dark] .chrome{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02))}
+html[data-theme=dark] .chrome .url-bar{background:rgba(140,175,230,.10)}
+html[data-theme=dark] .nav-close{background:rgba(255,255,255,.06)}
+html[data-theme=dark] .theme-switch .track{background:rgba(140,175,230,.20)}
+html[data-theme=dark] .checklist input[type=checkbox]{background:rgba(140,175,230,.10);border-color:rgba(140,175,230,.35)}
+html[data-theme=dark] .nav-toggle{background:linear-gradient(165deg,rgba(40,50,72,.6),rgba(24,31,46,.4));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 0 1px rgba(140,175,230,.12),0 2px 10px rgba(0,0,0,.4)}
+html[data-theme=dark] .diagram-box svg rect[fill^="rgba(255,255,255"]{fill:rgba(255,255,255,.055)}
+html[data-theme=dark] .diagram-box svg text[fill="#4a4a55"]{fill:#c6cede}
+html[data-theme=dark] .diagram-box svg text[fill="#7d8aa0"]{fill:#94a1b8}
+
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua điều hướng</a>
+<nav>
+  <div class="logo"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM18 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 0v3a4 4 0 0 1-4 4H6"/></svg></span>merge 08/09</div>
+  <a href="#sec-0"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg></span>Bối cảnh rẽ nhánh</a>
+  <a href="#sec-1"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h6l2 3h8M4 6v12h16V9"/><path d="M9 13l3 3 3-3"/></svg></span>Ba xung đột</a>
+  <a href="#sec-2"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/></svg></span>Dọn ngoài xung đột</a>
+  <a href="#sec-3"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 17l5-5-5-5M12 19h8"/></svg></span>CI tại local</a>
+  <a href="#sec-4"><span class="ic"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>Nghiệm thu &amp; eval</a>
+  <a href="#sec-5"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 4.3L2.7 17.6A1.5 1.5 0 0 0 4 20h16a1.5 1.5 0 0 0 1.3-2.4L13.7 4.3a2 2 0 0 0-3.4 0z"/></svg></span>Nợ mở</a>
+</nav>
+<main id="main">
+<header class="hero">
+  <span class="eyebrow">08/09/2026 · merge round</span>
+  <h1>Kéo 106 commit upstream về fork mà không đánh mất định danh</h1>
+  <p class="lead">Sau 40 ngày rẽ nhánh, <code>Rheinmir/setup@orca</code> đi tiếp 106 commit còn fork <code>dragonwar000/stackoverflow@main</code> đi 13. Trang này ghi lại cách hợp nhất hai nhánh đó: ba xung đột giải theo bằng chứng đo được chứ không theo <code>--ours</code>/<code>--theirs</code>, hai việc dọn nằm ngoài xung đột, và trọn luồng CI chạy tại local trước khi push.</p>
+  <div class="meta">
+    <span>merge-base 14ffaec</span>
+    <span>upstream +106</span>
+    <span>fork +13</span>
+    <span>413 file · +58.3k / −2.3k</span>
+    <span>merge e493ac29</span>
+  </div>
+</header>
+
+<div class="mm"><div class="mm-canvas"><svg class="mm-links"></svg><div class="tree"><div class="row">
+  <div class="node root has-children"><span class="nm">Merge 08/09</span><span class="ds">upstream@orca → fork@main</span><span class="ct">6</span></div>
+  <div class="children">
+    <div class="row">
+      <div class="node b-0 cat has-children"><span class="nm">Bối cảnh</span><span class="ds">hai nhánh đã thật sự rẽ</span><span class="ct">4</span></div>
+      <div class="children">
+        <div class="row"><div class="node b-0 leaf"><span class="nm">merge-base 14ffaec</span><span class="ds">điểm rẽ 30/07</span></div></div>
+        <div class="row"><div class="node b-0 leaf"><span class="nm">upstream +106</span><span class="ds">tới ed4ba62 ngày 08/09</span></div></div>
+        <div class="row"><div class="node b-0 leaf"><span class="nm">fork +13</span><span class="ds">chạm đúng 10 file</span></div></div>
+        <div class="row"><div class="node b-0 leaf"><span class="nm">4 file định danh</span><span class="ds">chỗ dễ kéo ngược nhất</span></div></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="node b-1 cat has-children"><span class="nm">Ba xung đột</span><span class="ds">giải theo bằng chứng</span><span class="ct">3</span></div>
+      <div class="children">
+        <div class="row"><div class="node b-1 leaf"><span class="nm">install.sh</span><span class="ds">tách cấu trúc khỏi định danh</span></div></div>
+        <div class="row"><div class="node b-1 leaf"><span class="nm">egress-guard.py</span><span class="ds">upstream là superset</span></div></div>
+        <div class="row"><div class="node b-1 leaf"><span class="nm">wiki/index.md</span><span class="ds">index phải khớp file trên đĩa</span></div></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="node b-2 cat has-children"><span class="nm">Dọn thêm</span><span class="ds">nằm ngoài conflict marker</span><span class="ct">2</span></div>
+      <div class="children">
+        <div class="row"><div class="node b-2 leaf"><span class="nm">54 file .pyc</span><span class="ds">gỡ khỏi index cho khớp .gitignore</span></div></div>
+        <div class="row"><div class="node b-2 leaf"><span class="nm">quét con trỏ Rheinmir</span><span class="ds">7 chỗ — đều có sẵn từ trước</span></div></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="node b-3 cat has-children"><span class="nm">CI tại local</span><span class="ds">14 cổng, xanh hết</span><span class="ct">5</span></div>
+      <div class="children">
+        <div class="row"><div class="node b-3 leaf"><span class="nm">self-test lõi</span><span class="ds">demo 13 + broad 80</span></div></div>
+        <div class="row"><div class="node b-3 leaf"><span class="nm">reachability</span><span class="ds">wiki-graph 18 + memory-map 13</span></div></div>
+        <div class="row"><div class="node b-3 leaf"><span class="nm">wiki gates</span><span class="ds">index-sync · wiki-health · dup-basename</span></div></div>
+        <div class="row"><div class="node b-3 leaf"><span class="nm">code gates</span><span class="ds">arch-scan 90 · code-health 142</span></div></div>
+        <div class="row"><div class="node b-3 leaf"><span class="nm">meta gates</span><span class="ds">harness-lint · parity · leak-gate</span></div></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="node b-4 cat has-children"><span class="nm">Nghiệm thu</span><span class="ds">đo hai chiều + neo bài học</span><span class="ct">3</span></div>
+      <div class="children">
+        <div class="row"><div class="node b-4 leaf"><span class="nm">diff = 7 file</span><span class="ds">đúng tập định danh đã chốt</span></div></div>
+        <div class="row"><div class="node b-4 leaf"><span class="nm">merge-fork-identity</span><span class="ds">golden eval mới</span></div></div>
+        <div class="row"><div class="node b-4 leaf"><span class="nm">merge-superset-conflict</span><span class="ds">golden eval mới</span></div></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="node b-0 cat has-children"><span class="nm">Nợ mở</span><span class="ds">chưa đóng, đã ghi</span><span class="ct">2</span></div>
+      <div class="children">
+        <div class="row"><div class="node b-0 leaf"><span class="nm">CI không trigger trên main</span><span class="ds">harness.yml chỉ gác nhánh orca</span></div></div>
+        <div class="row"><div class="node b-0 leaf"><span class="nm">baseline eval từng lệch</span><span class="ds">đã dựng lại đủ 7/7</span></div></div>
+      </div>
+    </div>
+  </div>
+</div></div></div></div>
+
+<div class="repo-card">
+  <div class="chrome">
+    <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57;display:inline-block"></span>
+    <span style="width:12px;height:12px;border-radius:50%;background:#ffbd2e;display:inline-block"></span>
+    <span style="width:12px;height:12px;border-radius:50%;background:#28c840;display:inline-block"></span>
+    <div class="url-bar">github.com/dragonwar000/stackoverflow — main @ e493ac29</div>
+  </div>
+  <div class="rc-body">
+    <div><b>Nguồn kéo về</b><code>Rheinmir/setup@orca</code> · 14ffaec → ed4ba62</div>
+    <div><b>Đích</b><code>dragonwar000/stackoverflow@main</code> · be3d679 → e493ac29</div>
+    <div><b>Khối lượng</b>413 file · +58 344 / −2 301 dòng</div>
+    <div><b>Xung đột</b>3 file · 0 marker còn sót</div>
+  </div>
+</div>
+
+<section id="sec-0" class="section-bg s-bg0">
+  <div class="section-header">
+    <span class="tag">01 · Bối cảnh</span>
+    <h2>Hai nhánh đã thật sự rẽ — đo trước khi đụng vào</h2>
+    <p>Câu hỏi đầu tiên không phải "merge thế nào" mà "có gì để merge không". <code>merge-base</code> trả về <code>14ffaec</code> (30/07): một điểm nằm giữa, không phải đầu nhánh nào. Nghĩa là cả hai bên đều đã đi tiếp — upstream 106 commit, fork 13 commit — nên đây là merge thật, không phải fast-forward.</p>
+  </div>
+
+  <div class="diagram-box">
+    <svg viewBox="0 0 900 250" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif">
+      <title>Sơ đồ rẽ nhánh: từ merge-base 14ffaec, upstream đi 106 commit và fork đi 13 commit, hai nhánh gặp lại ở commit merge e493ac29</title>
+      <defs>
+        <style>
+          .flow{stroke-dasharray:6 4;animation:flowArrow 1.1s linear infinite}
+          .pulseN{animation:pulse 2.4s ease-in-out infinite}
+        </style>
+        <marker id="ar0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0 0L10 5L0 10z" fill="#0a84ff"/>
+        </marker>
+        <marker id="ar0b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0 0L10 5L0 10z" fill="#5856d6"/>
+        </marker>
+      </defs>
+
+      <rect x="20" y="100" width="150" height="50" rx="8" fill="rgba(255,255,255,.7)" stroke="#9aa4b2" stroke-width="1.5"/>
+      <text x="95" y="120" text-anchor="middle" font-size="11" font-weight="700" fill="#4a4a55">merge-base</text>
+      <text x="95" y="136" text-anchor="middle" font-size="10" fill="#7d8aa0">14ffaec · 30/07</text>
+
+      <rect x="290" y="26" width="180" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#0a84ff" stroke-width="1.6" class="pulseN"/>
+      <text x="380" y="47" text-anchor="middle" font-size="11" font-weight="700" fill="#0a84ff">upstream · orca</text>
+      <text x="380" y="63" text-anchor="middle" font-size="10" fill="#4a4a55">+106 commit → ed4ba62</text>
+
+      <rect x="290" y="172" width="180" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.6"/>
+      <text x="380" y="193" text-anchor="middle" font-size="11" font-weight="700" fill="#5856d6">fork · main</text>
+      <text x="380" y="209" text-anchor="middle" font-size="10" fill="#4a4a55">+13 commit → be3d679</text>
+
+      <rect x="580" y="99" width="170" height="52" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.8"/>
+      <text x="665" y="119" text-anchor="middle" font-size="11" font-weight="700" fill="#28a745">merge e493ac29</text>
+      <text x="665" y="135" text-anchor="middle" font-size="10" fill="#4a4a55">413 file · 3 xung đột</text>
+
+      <rect x="790" y="99" width="92" height="52" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff9500" stroke-width="1.5"/>
+      <text x="836" y="119" text-anchor="middle" font-size="10.5" font-weight="700" fill="#f08c00">diff = 7</text>
+      <text x="836" y="134" text-anchor="middle" font-size="9.5" fill="#4a4a55">file định danh</text>
+
+      <line x1="170" y1="118" x2="290" y2="60" stroke="#0a84ff" stroke-width="2" class="flow" marker-end="url(#ar0)"/>
+      <line x1="170" y1="133" x2="290" y2="192" stroke="#5856d6" stroke-width="2" class="flow" marker-end="url(#ar0b)"/>
+      <line x1="470" y1="60" x2="580" y2="116" stroke="#0a84ff" stroke-width="2" class="flow" marker-end="url(#ar0)"/>
+      <line x1="470" y1="192" x2="580" y2="136" stroke="#5856d6" stroke-width="2" class="flow" marker-end="url(#ar0b)"/>
+      <line x1="750" y1="125" x2="790" y2="125" stroke="#ff9500" stroke-width="2" class="flow" marker-end="url(#ar0)"/>
+    </svg>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <h4>Đo được gì trước khi merge</h4>
+      <ul>
+        <li><code>git merge-base</code> = <code>14ffaec</code> — nằm giữa, nên không bên nào chứa bên nào.</li>
+        <li><code>rev-list --count orca ^main</code> = 106 · chiều ngược lại = 13.</li>
+        <li>13 commit của fork chạm đúng <b>10 file</b> — đủ nhỏ để liệt kê hết bằng tay.</li>
+        <li>Trong 10 file đó, <b>5 file là đường cài</b>: README, bootstrap.sh, bootstrap-fork.sh, install.sh, install-harness.sh.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Vì sao phải liệt kê trước</h4>
+      <p>Danh sách file riêng của fork chính là <b>bài kiểm tra sau merge</b>. Không có nó thì "merge xong, có vẻ ổn" là toàn bộ bằng chứng.</p>
+      <ul>
+        <li>Có danh sách → sau merge <code>diff</code> với upstream phải ra <b>đúng</b> tập đó.</li>
+        <li>Dư một file → merge kéo ngược thứ gì đó của upstream vào.</li>
+        <li>Thiếu một file → merge đánh rơi thứ gì đó của fork.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="sec-foot">Chi tiết: <code>llmwiki/wiki/draft/cave/080926-merge-upstream-setup.md</code></p>
+</section>
+
+<section id="sec-1" class="section-bg s-bg1">
+  <div class="section-header">
+    <span class="tag">02 · Xung đột</span>
+    <h2>Ba xung đột, ba câu hỏi khác nhau</h2>
+    <p>Không cái nào giải được bằng <code>--ours</code> hay <code>--theirs</code>. Mỗi cái hỏi một chuyện riêng: hunk này có trộn hai thay đổi độc lập không · hai bản có quan hệ bao hàm không · index có còn khớp file trên đĩa không.</p>
+  </div>
+
+  <div class="diagram-box">
+    <svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif">
+      <title>Ba xung đột và đường quyết định: install.sh tách cấu trúc khỏi định danh, egress-guard lấy bản superset, wiki index lấy bản khớp file trên đĩa</title>
+      <defs>
+        <style>.flow{stroke-dasharray:6 4;animation:flowArrow 1.1s linear infinite}</style>
+        <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#30b0c7"/></marker>
+      </defs>
+
+      <rect x="18" y="24" width="176" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#30b0c7" stroke-width="1.6"/>
+      <text x="106" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#30b0c7">install.sh</text>
+      <text x="106" y="61" text-anchor="middle" font-size="9.5" fill="#4a4a55">2 thay đổi trong 1 hunk</text>
+
+      <rect x="18" y="120" width="176" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#30b0c7" stroke-width="1.6"/>
+      <text x="106" y="141" text-anchor="middle" font-size="10.5" font-weight="700" fill="#30b0c7">egress-guard.py</text>
+      <text x="106" y="157" text-anchor="middle" font-size="9.5" fill="#4a4a55">cả 2 bên vá cùng bug</text>
+
+      <rect x="18" y="216" width="176" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#30b0c7" stroke-width="1.6"/>
+      <text x="106" y="237" text-anchor="middle" font-size="10.5" font-weight="700" fill="#30b0c7">wiki/index.md</text>
+      <text x="106" y="253" text-anchor="middle" font-size="9.5" fill="#4a4a55">2 dòng vs 45 dòng</text>
+
+      <rect x="300" y="24" width="230" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.5"/>
+      <text x="415" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#5856d6">Hunk có trộn 2 việc?</text>
+      <text x="415" y="61" text-anchor="middle" font-size="9.5" fill="#4a4a55">cấu trúc ↔ định danh</text>
+
+      <rect x="300" y="120" width="230" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.5"/>
+      <text x="415" y="141" text-anchor="middle" font-size="10.5" font-weight="700" fill="#5856d6">Bên nào bao bên nào?</text>
+      <text x="415" y="157" text-anchor="middle" font-size="9.5" fill="#4a4a55">diff 2 bản, không đọc hunk</text>
+
+      <rect x="300" y="216" width="230" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.5"/>
+      <text x="415" y="237" text-anchor="middle" font-size="10.5" font-weight="700" fill="#5856d6">Index khớp đĩa không?</text>
+      <text x="415" y="253" text-anchor="middle" font-size="9.5" fill="#4a4a55">đọc file thật sau merge</text>
+
+      <rect x="640" y="24" width="240" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.6"/>
+      <text x="760" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">lấy $OVERSTACK_DIR</text>
+      <text x="760" y="61" text-anchor="middle" font-size="9.5" fill="#4a4a55">giữ REPO_RAW của fork</text>
+
+      <rect x="640" y="120" width="240" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.6"/>
+      <text x="760" y="141" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">lấy trọn upstream</text>
+      <text x="760" y="157" text-anchor="middle" font-size="9.5" fill="#4a4a55">superset — mất 0 dòng</text>
+
+      <rect x="640" y="216" width="240" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.6"/>
+      <text x="760" y="237" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">lấy khối upstream</text>
+      <text x="760" y="253" text-anchor="middle" font-size="9.5" fill="#4a4a55">R3 index-sync xanh</text>
+
+      <line x1="194" y1="52" x2="300" y2="52" stroke="#30b0c7" stroke-width="2" class="flow" marker-end="url(#ar1)"/>
+      <line x1="194" y1="148" x2="300" y2="148" stroke="#30b0c7" stroke-width="2" class="flow" marker-end="url(#ar1)"/>
+      <line x1="194" y1="244" x2="300" y2="244" stroke="#30b0c7" stroke-width="2" class="flow" marker-end="url(#ar1)"/>
+      <line x1="530" y1="52" x2="640" y2="52" stroke="#30b0c7" stroke-width="2" class="flow" marker-end="url(#ar1)"/>
+      <line x1="530" y1="148" x2="640" y2="148" stroke="#30b0c7" stroke-width="2" class="flow" marker-end="url(#ar1)"/>
+      <line x1="530" y1="244" x2="640" y2="244" stroke="#30b0c7" stroke-width="2" class="flow" marker-end="url(#ar1)"/>
+    </svg>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>File</th><th>Hai bên sửa gì</th><th>Quyết định</th><th>Bằng chứng</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>install.sh</b></td>
+          <td>Upstream thay đường dẫn cứng bằng biến <code>$OVERSTACK_DIR</code>; fork đổi <code>REPO_RAW</code> sang repo của chính nó.</td>
+          <td>Lấy phần cấu trúc của upstream, <b>giữ</b> <code>REPO_RAW</code> + <code>SKILLS_REF</code> của fork.</td>
+          <td>Hai thay đổi độc lập nằm chung một hunk — chọn cả file theo một bên là mất bên kia, im lặng.</td>
+        </tr>
+        <tr>
+          <td><b>egress-guard.py</b></td>
+          <td>Cả hai cùng vá bug guard chấm host trong toàn bộ command string nên chặn nhầm commit message.</td>
+          <td>Lấy <b>trọn bản upstream</b>.</td>
+          <td><code>git show</code> hai bản ra file rồi <code>diff</code>: upstream chứa đúng fix của fork, cộng <code>_NOT_A_TLD</code> + <code>bare_ok</code>. Sau khi giải, file khớp nguyên văn bản upstream.</td>
+        </tr>
+        <tr>
+          <td><b>llmwiki/wiki/index.md</b></td>
+          <td>Fork thêm 2 dòng provenance; upstream tách/đổi tên thành các dòng có hậu tố <code>-1319b8e1</code>.</td>
+          <td>Lấy <b>khối upstream</b>.</td>
+          <td>Đọc file thật sau merge: <code>300726-session-provenance.md</code> là phiên <code>0121bc61</code> — giữ dòng của fork sẽ thành index trỏ sai. <code>index_sync</code> xanh sau khi lấy upstream.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <h4>Chỗ suýt mất — install.sh</h4>
+      <div class="code-wrap"><pre class="code-block"><span class="c"># &lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD (fork)</span>
+REPO_RAW=<span class="g">"${REPO_RAW:-https://…/dragonwar000/stackoverflow/main}"</span>
+mkdir -p <span class="g">"$ROOT/llmwiki/html"</span>
+<span class="c"># ======= (upstream)</span>
+REPO_RAW=<span class="r">"${REPO_RAW:-https://…/Rheinmir/setup/orca}"</span>
+mkdir -p <span class="g">"$ROOT/$OVERSTACK_DIR/html"</span>
+
+<span class="c"># → giải: dòng trên của fork + dòng dưới của upstream</span></pre></div>
+      <p>Lấy <code>--theirs</code> thì người mới <code>curl</code> về sẽ cài bản upstream chứ không phải bản fork. Lấy <code>--ours</code> thì mất cải tiến layout. Cả hai đều không báo lỗi.</p>
+    </div>
+    <div class="card">
+      <h4>Chỗ suýt mất — egress-guard.py</h4>
+      <p>Hunk chỉ cho thấy <b>chỗ hai bên chạm nhau</b>, không cho thấy <b>quan hệ bao hàm</b>. Phải kéo cả hai bản ra rồi so:</p>
+      <div class="code-wrap"><pre class="code-block">git show origin/orca:harness/scripts/egress-guard.py &gt; /tmp/a.py
+git show stackoverflow/main:harness/scripts/egress-guard.py &gt; /tmp/b.py
+diff -u /tmp/b.py /tmp/a.py   <span class="c"># upstream ⊃ fork</span></pre></div>
+      <ul>
+        <li>Bản fork: thu phạm vi về đúng segment có lệnh net.</li>
+        <li>Bản upstream: <b>có đúng phần đó</b> + lọc <code>bootstrap.sh</code>, <code>uat.env</code>, <code>spec.loader</code> khỏi bị đọc thành hostname.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="sec-foot">Golden neo bài học: <code>fdk/wiki/sources/evals/merge-superset-conflict.md</code></p>
+</section>
+
+<section id="sec-2" class="section-bg s-bg2">
+  <div class="section-header">
+    <span class="tag">03 · Dọn thêm</span>
+    <h2>Hai việc nằm ngoài conflict marker</h2>
+    <p>Git chỉ dựng marker ở chỗ hai bên sửa <em>cùng dòng</em>. Thứ nguy hiểm hơn là chỗ hai bên có <em>chính sách khác nhau</em> mà git không thấy — ở đây là file build artifact, và các con trỏ về repo gốc.</p>
+  </div>
+
+  <div class="diagram-box">
+    <svg viewBox="0 0 900 230" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif">
+      <title>Hai việc dọn ngoài xung đột: gỡ 54 file .pyc khỏi index git, và quét lại các con trỏ về Rheinmir/setup để xác nhận chúng có sẵn từ trước</title>
+      <defs>
+        <style>.flow{stroke-dasharray:6 4;animation:flowArrow 1.1s linear infinite}</style>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#5856d6"/></marker>
+      </defs>
+
+      <rect x="24" y="30" width="184" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.6"/>
+      <text x="116" y="51" text-anchor="middle" font-size="10.5" font-weight="700" fill="#5856d6">merge kéo về</text>
+      <text x="116" y="67" text-anchor="middle" font-size="9.5" fill="#4a4a55">54 file .pyc mới</text>
+
+      <rect x="330" y="30" width="204" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff9500" stroke-width="1.6"/>
+      <text x="432" y="51" text-anchor="middle" font-size="10.5" font-weight="700" fill="#f08c00">chính sách fork</text>
+      <text x="432" y="67" text-anchor="middle" font-size="9.5" fill="#4a4a55">.gitignore chặn __pycache__</text>
+
+      <rect x="660" y="30" width="204" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.6"/>
+      <text x="762" y="51" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">git rm --cached</text>
+      <text x="762" y="67" text-anchor="middle" font-size="9.5" fill="#4a4a55">tracked .pyc = 0</text>
+
+      <rect x="24" y="146" width="184" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#5856d6" stroke-width="1.6"/>
+      <text x="116" y="167" text-anchor="middle" font-size="10.5" font-weight="700" fill="#5856d6">quét cây đã merge</text>
+      <text x="116" y="183" text-anchor="middle" font-size="9.5" fill="#4a4a55">grep Rheinmir/setup</text>
+
+      <rect x="330" y="146" width="204" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff9500" stroke-width="1.6"/>
+      <text x="432" y="167" text-anchor="middle" font-size="10.5" font-weight="700" fill="#f08c00">so với so/main cũ</text>
+      <text x="432" y="183" text-anchor="middle" font-size="9.5" fill="#4a4a55">git cat-file -e từng file</text>
+
+      <rect x="660" y="146" width="204" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.6"/>
+      <text x="762" y="167" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">7/7 đã có sẵn</text>
+      <text x="762" y="183" text-anchor="middle" font-size="9.5" fill="#4a4a55">con trỏ template có chủ ý</text>
+
+      <line x1="208" y1="57" x2="330" y2="57" stroke="#5856d6" stroke-width="2" class="flow" marker-end="url(#ar2)"/>
+      <line x1="534" y1="57" x2="660" y2="57" stroke="#5856d6" stroke-width="2" class="flow" marker-end="url(#ar2)"/>
+      <line x1="208" y1="173" x2="330" y2="173" stroke="#5856d6" stroke-width="2" class="flow" marker-end="url(#ar2)"/>
+      <line x1="534" y1="173" x2="660" y2="173" stroke="#5856d6" stroke-width="2" class="flow" marker-end="url(#ar2)"/>
+    </svg>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <h4>54 file <code>.pyc</code></h4>
+      <p>Upstream còn track build artifact dưới <code>skills/last30days/</code>; fork đã gỡ 127 file <code>.pyc</code> và chặn <code>__pycache__/</code> từ commit <code>aebb940</code>. Merge kéo chúng vào lại như file <b>mới</b> — không xung đột, không cảnh báo.</p>
+      <div class="code-wrap"><pre class="code-block">git ls-files | grep -c <span class="g">'\.pyc$'</span>   <span class="c"># 54 sau merge</span>
+git rm -r --cached -q $(git ls-files | grep <span class="g">'\.pyc$'</span>)
+git ls-files | grep -c <span class="g">'\.pyc$'</span>   <span class="c"># 0</span></pre></div>
+    </div>
+    <div class="card">
+      <h4>Con trỏ về repo gốc</h4>
+      <p>Cây đã merge còn 7 chỗ hardcode <code>Rheinmir/setup</code> ngoài đường cài. Câu hỏi đúng không phải "có nên đổi không" mà <b>"chúng mới xuất hiện hay đã có từ trước"</b>.</p>
+      <ul>
+        <li><code>version.json</code>, <code>.template-manifest.json</code> — nguồn template-sync, fork vốn đã trỏ upstream.</li>
+        <li><code>fdk-kit.sh</code>, <code>harness-events.py</code>, <code>fresh-install-smoke.sh</code>, <code>gen-converters.py</code>, <code>build-overstack-docs.py</code> — <code>git cat-file -e</code> trên <code>stackoverflow/main</code> cũ: <b>tồn tại y hệt</b>.</li>
+        <li>Kết luận: merge <b>không</b> sinh drift định danh mới.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="sec-foot">Golden neo bài học: <code>fdk/wiki/sources/evals/merge-fork-identity.md</code></p>
+</section>
+
+<section id="sec-3" class="section-bg s-bg3">
+  <div class="section-header">
+    <span class="tag">04 · CI tại local</span>
+    <h2>Chạy trọn luồng CI trước khi push, không sau</h2>
+    <p>Rule FDK: trước khi ship push thì đối chiếu luồng CI GitHub tại local. Ở đây nó không phải nghi thức — workflow <code>harness.yml</code> chỉ trigger <code>push</code> trên nhánh <code>orca</code>, nên push vào <code>main</code> của fork <b>không</b> chạy CI nào. Local là cổng duy nhất.</p>
+  </div>
+
+  <div class="diagram-box">
+    <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif">
+      <title>Bốn nhóm cổng CI chạy tại local trên cây đã merge — self-test lõi, reachability, cổng wiki, cổng code và meta — tất cả xanh trước khi push</title>
+      <defs>
+        <style>.flow{stroke-dasharray:6 4;animation:flowArrow 1.1s linear infinite}
+        .floatN{animation:float 3s ease-in-out infinite}</style>
+        <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#34c759"/></marker>
+      </defs>
+
+      <rect x="18" y="108" width="150" height="58" rx="8" fill="rgba(255,255,255,.7)" stroke="#9aa4b2" stroke-width="1.6"/>
+      <text x="93" y="130" text-anchor="middle" font-size="10.5" font-weight="700" fill="#4a4a55">cây đã merge</text>
+      <text x="93" y="146" text-anchor="middle" font-size="9.5" fill="#7d8aa0">0 marker · 0 .pyc</text>
+
+      <rect x="270" y="14" width="216" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.5"/>
+      <text x="378" y="34" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">self-test lõi</text>
+      <text x="378" y="50" text-anchor="middle" font-size="9.5" fill="#4a4a55">demo 13/13 · broad 80/80</text>
+
+      <rect x="270" y="88" width="216" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.5"/>
+      <text x="378" y="108" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">reachability</text>
+      <text x="378" y="124" text-anchor="middle" font-size="9.5" fill="#4a4a55">wiki-graph 18 · memory-map 13</text>
+
+      <rect x="270" y="162" width="216" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.5"/>
+      <text x="378" y="182" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">cổng wiki</text>
+      <text x="378" y="198" text-anchor="middle" font-size="9.5" fill="#4a4a55">index-sync · health · dup-basename</text>
+
+      <rect x="270" y="236" width="216" height="54" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.5"/>
+      <text x="378" y="256" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">cổng code &amp; meta</text>
+      <text x="378" y="272" text-anchor="middle" font-size="9.5" fill="#4a4a55">arch-scan 90 · code-health 142</text>
+
+      <rect x="606" y="108" width="180" height="58" rx="8" fill="rgba(255,255,255,.7)" stroke="#0a84ff" stroke-width="1.8" class="floatN"/>
+      <text x="696" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#0a84ff">14 cổng xanh</text>
+      <text x="696" y="146" text-anchor="middle" font-size="9.5" fill="#4a4a55">→ push e493ac29</text>
+
+      <line x1="168" y1="128" x2="270" y2="41" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+      <line x1="168" y1="134" x2="270" y2="115" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+      <line x1="168" y1="142" x2="270" y2="189" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+      <line x1="168" y1="150" x2="270" y2="263" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+      <line x1="486" y1="41" x2="606" y2="124" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+      <line x1="486" y1="115" x2="606" y2="132" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+      <line x1="486" y1="189" x2="606" y2="142" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+      <line x1="486" y1="263" x2="606" y2="152" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar3)"/>
+    </svg>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cổng</th><th>Lệnh</th><th>Kết quả</th></tr></thead>
+      <tbody>
+        <tr><td>self-test lõi (demo)</td><td><code>bash harness/poc-vendor-neutral/demo.sh</code></td><td><b>13 PASS · 0 FAIL</b></td></tr>
+        <tr><td>self-test lõi (broad)</td><td><code>bash harness/poc-vendor-neutral/test-broad.sh</code></td><td><b>80 PASS · 0 FAIL</b></td></tr>
+        <tr><td>wiki-graph reachability</td><td><code>bash harness/tests/wiki-graph-user-reachability-test.sh .</code></td><td><b>18 pass · 0 fail</b></td></tr>
+        <tr><td>memory-map reachability</td><td><code>bash harness/tests/memory-map-user-reachability-test.sh .</code></td><td><b>13 pass · 0 fail</b></td></tr>
+        <tr><td>R3 index-sync</td><td><code>index_sync.py --wiki-dir fdk/wiki</code> + <code>llmwiki/wiki</code></td><td>exit 0 (cả hai wiki)</td></tr>
+        <tr><td>L4 wiki-health</td><td><code>wiki-health.py --wiki-dir fdk/wiki --fail-on broken</code></td><td>0 broken wikilink</td></tr>
+        <tr><td>arch-scan</td><td><code>arch-scan.py --root .</code></td><td><b>sạch (90 file)</b></td></tr>
+        <tr><td>code-health</td><td><code>code_health.py --root .</code></td><td><b>142 file Python compile sạch</b></td></tr>
+        <tr><td>harness-lint</td><td><code>harness-lint.py --check</code></td><td><b>0 drift finding</b></td></tr>
+        <tr><td>agent↔claude parity</td><td><code>agent_claude_parity.py</code></td><td><b>88 skill khớp</b></td></tr>
+        <tr><td>duplicate-basename</td><td><code>duplicate_basename.py --wiki-dir fdk/wiki</code></td><td>exit 0</td></tr>
+        <tr><td>capabilities current</td><td><code>build-capabilities.py --check</code></td><td><b>CAPABILITIES.md khớp đĩa</b></td></tr>
+        <tr><td>adapt-registry leak-gate</td><td><code>adapt-registry.py --check</code></td><td><b>89 hằng số quarantine · 0 rò</b></td></tr>
+        <tr><td>tests-wired</td><td>mọi <code>harness/tests/*-test.sh</code> có step trong workflow</td><td>0 test chưa wire</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <h4>Kiểm cú pháp trước khi chạy gate</h4>
+      <p>Merge 413 file thì lỗi rẻ nhất là file dính conflict marker hoặc gãy cú pháp. Quét trước, chạy gate sau:</p>
+      <div class="code-wrap"><pre class="code-block"><span class="c"># 0 file còn marker</span>
+grep -rln <span class="g">'^&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD'</span> --exclude-dir=.git .
+
+<span class="c"># mọi .py / .sh đổi đều parse được</span>
+<span class="k">for</span> f <span class="k">in</span> $(git diff --cached --name-only --diff-filter=ACM | grep <span class="g">'\.py$'</span>); <span class="k">do</span>
+  python3 -c <span class="g">"import ast;ast.parse(open('$f',encoding='utf-8').read())"</span>
+<span class="k">done</span></pre></div>
+    </div>
+    <div class="card">
+      <h4>Vì sao local là cổng duy nhất</h4>
+      <ul>
+        <li><code>harness.yml</code> khai <code>on.push.branches: [orca]</code> — fork đẩy vào <code>main</code> thì workflow không chạy.</li>
+        <li>Trigger <code>pull_request</code> vẫn hoạt động ở mọi nhánh — nên đường PR có CI, đường push thẳng thì không.</li>
+        <li>Chọn push thẳng vào <code>main</code> = tự nhận trách nhiệm chạy hết cổng ở local. Đó là việc đã làm.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="sec-4" class="section-bg s-bg4">
+  <div class="section-header">
+    <span class="tag">05 · Nghiệm thu</span>
+    <h2>Đo hai chiều, rồi neo bài học vào eval</h2>
+    <p>"Merge xong, test xanh" chưa phải nghiệm thu — test xanh cũng xanh khi merge lỡ kéo ngược định danh về upstream. Phép đo thật là so cây đã merge với chính upstream: phần chênh phải đúng bằng tập file đã chốt ở bước 1.</p>
+  </div>
+
+  <div class="diagram-box">
+    <svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif">
+      <title>Nghiệm thu hai chiều: diff cây đã merge với upstream ra đúng 7 file định danh — dư là kéo ngược, thiếu là đánh rơi</title>
+      <defs>
+        <style>.flow{stroke-dasharray:6 4;animation:flowArrow 1.1s linear infinite}</style>
+        <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ff9500"/></marker>
+        <marker id="ar4r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ff2d55"/></marker>
+      </defs>
+
+      <rect x="30" y="80" width="180" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff9500" stroke-width="1.6"/>
+      <text x="120" y="101" text-anchor="middle" font-size="10.5" font-weight="700" fill="#f08c00">git diff HEAD origin/orca</text>
+      <text x="120" y="117" text-anchor="middle" font-size="9.5" fill="#4a4a55">bỏ qua *.pyc</text>
+
+      <rect x="330" y="80" width="200" height="56" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.8"/>
+      <text x="430" y="101" text-anchor="middle" font-size="11" font-weight="700" fill="#28a745">đúng 7 file</text>
+      <text x="430" y="117" text-anchor="middle" font-size="9.5" fill="#4a4a55">5 đường cài + 2 orca-onboard</text>
+
+      <rect x="646" y="20" width="216" height="52" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff2d55" stroke-width="1.5"/>
+      <text x="754" y="40" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e0264b">dư một file</text>
+      <text x="754" y="56" text-anchor="middle" font-size="9.5" fill="#4a4a55">merge kéo ngược upstream</text>
+
+      <rect x="646" y="144" width="216" height="52" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff2d55" stroke-width="1.5"/>
+      <text x="754" y="164" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e0264b">thiếu một file</text>
+      <text x="754" y="180" text-anchor="middle" font-size="9.5" fill="#4a4a55">merge đánh rơi phần fork</text>
+
+      <line x1="210" y1="108" x2="330" y2="108" stroke="#ff9500" stroke-width="2" class="flow" marker-end="url(#ar4)"/>
+      <line x1="530" y1="98" x2="646" y2="50" stroke="#ff2d55" stroke-width="2" class="flow" marker-end="url(#ar4r)"/>
+      <line x1="530" y1="120" x2="646" y2="168" stroke="#ff2d55" stroke-width="2" class="flow" marker-end="url(#ar4r)"/>
+    </svg>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <h4>Kết quả đo</h4>
+      <div class="code-wrap"><pre class="code-block">$ git diff --stat HEAD origin/orca -- . <span class="g">':(exclude)*.pyc'</span>
+ README.md                                    | 50 +--
+ harness/poc-vendor-neutral/bootstrap-fork.sh |  8 +-
+ harness/poc-vendor-neutral/bootstrap.sh      |  4 +-
+ harness/poc-vendor-neutral/install.sh        |  4 +-
+ harness/scripts/install-harness.sh           |  4 +-
+ llmwiki/skills/orchestrate/orca-onboard.md   | 58 +--
+ skills/orca-onboard/SKILL.md                 | 58 +--
+ <span class="g">7 files changed</span></pre></div>
+      <p>Khớp đúng danh sách chốt ở bước 1 — không dư, không thiếu.</p>
+    </div>
+    <div class="card">
+      <h4>Checklist nghiệm thu</h4>
+      <ul class="checklist">
+        <li><input type="checkbox" id="k1" checked><label for="k1">0 conflict marker trong toàn cây</label></li>
+        <li><input type="checkbox" id="k2" checked><label for="k2">0 file <code>.pyc</code> được track</label></li>
+        <li><input type="checkbox" id="k3" checked><label for="k3">5 file đường cài còn trỏ <code>dragonwar000/stackoverflow</code></label></li>
+        <li><input type="checkbox" id="k4" checked><label for="k4">diff với upstream = đúng 7 file định danh</label></li>
+        <li><input type="checkbox" id="k5" checked><label for="k5">14 cổng CI chạy tại local, xanh hết</label></li>
+        <li><input type="checkbox" id="k6" checked><label for="k6">remote <code>main</code> = <code>e493ac29</code> sau push</label></li>
+      </ul>
+    </div>
+  </div>
+
+  <button class="collapse-toggle" id="tgEval"><span class="arrow" id="arEval">▶</span> Hai golden eval mới — và cái baseline từng lệch</button>
+  <div class="collapse-body" id="bodyEval"><div class="collapse-body-inner">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Golden</th><th>Câu hỏi</th><th>Assert tier-1</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>merge-fork-identity</b></td>
+            <td>Fork đã đổi nguồn cài trỏ về chính nó, xung đột rơi đúng dòng <code>REPO_RAW</code> — giải thế nào và nghiệm thu bằng gì?</td>
+            <td><code>contains:REPO_RAW</code> · <code>icontains:định danh</code> · <code>regex:(?i)ours/theirs</code> · <code>regex:(?i)(grep|diff)</code></td>
+          </tr>
+          <tr>
+            <td><b>merge-superset-conflict</b></td>
+            <td>Hai nhánh cùng vá một bug trên cùng file rồi xung đột — chọn bên nào, bằng chứng là gì?</td>
+            <td><code>icontains:superset</code> · <code>contains:egress-guard</code> · <code>regex:(?i)(đo trước|diff)</code> · <code>regex:(?i)(không mất|mất 0)</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <h4>Cổng eval cắn thật</h4>
+        <div class="code-wrap"><pre class="code-block">$ python3 harness/scripts/wikieval.py --self-test
+<span class="g">[wikieval selftest] 7 golden(s) with tier-1 asserts</span>
+  [OK ] merge-fork-identity      expected satisfies its own asserts
+  [OK ] merge-superset-conflict  expected satisfies its own asserts
+<span class="g">SELFTEST: ALL PASS</span>
+
+<span class="c"># đổi 1 output thành "Cứ lấy theirs cho nhanh." rồi --check</span>
+<span class="r">FAIL merge-superset-conflict: pass True -&gt; False</span>
+<span class="c"># exit 2 — gate hồi quy thật sự chặn</span></pre></div>
+        <p><code>--self-test</code> đã nằm trong <code>fdk-gate.py</code>, nên hai golden này được gác cùng lượt với các cổng khác.</p>
+      </div>
+      <div class="card">
+        <h4>Baseline từng lệch — đã dựng lại</h4>
+        <p>Baseline commit từ 18/07 ghi 4 golden đang pass, nhưng bộ candidate output đi kèm chỉ có 2 mục. Nên <code>--check</code> báo hồi quy giả cho <code>adapt-modes-pick</code> và <code>capproof-liveness</code> — nợ có sẵn, chưa ai chạm vì <code>--check</code> không được wire vào CI.</p>
+        <ul>
+          <li>Bù candidate output cho 3 golden còn thiếu → <b>7/7 decided</b>.</li>
+          <li>Ghi lại baseline: <code>harness/metrics/eval-baseline.json</code>, ngày 2026-09-08.</li>
+          <li><code>--check</code> giờ exit 0; bẻ một output thì exit 2.</li>
+        </ul>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section id="sec-5" class="section-bg s-bg5">
+  <div class="section-header">
+    <span class="tag">06 · Nợ mở</span>
+    <h2>Cái chưa đóng, và vì sao để lại</h2>
+    <p>Ghi ra thay vì lặng lẽ vá — mỗi món đều đổi hành vi của repo theo cách người chủ nên tự quyết.</p>
+  </div>
+
+  <div class="diagram-box">
+    <svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif">
+      <title>Nợ mở: push lên nhánh orca kích hoạt CI, push lên main của fork thì không, còn pull request thì luôn chạy CI</title>
+      <defs>
+        <style>.flow{stroke-dasharray:6 4;animation:flowArrow 1.1s linear infinite}</style>
+        <marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ff2d55"/></marker>
+        <marker id="ar5g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#34c759"/></marker>
+      </defs>
+
+      <rect x="26" y="18" width="180" height="48" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.5"/>
+      <text x="116" y="38" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">push → orca</text>
+      <text x="116" y="54" text-anchor="middle" font-size="9.5" fill="#4a4a55">nhánh của repo gốc</text>
+
+      <rect x="26" y="80" width="180" height="48" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff2d55" stroke-width="1.6"/>
+      <text x="116" y="100" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e0264b">push → main</text>
+      <text x="116" y="116" text-anchor="middle" font-size="9.5" fill="#4a4a55">nhánh của fork</text>
+
+      <rect x="26" y="142" width="180" height="48" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.5"/>
+      <text x="116" y="162" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">pull request</text>
+      <text x="116" y="178" text-anchor="middle" font-size="9.5" fill="#4a4a55">mọi nhánh</text>
+
+      <rect x="330" y="72" width="210" height="60" rx="8" fill="rgba(255,255,255,.7)" stroke="#9aa4b2" stroke-width="1.6"/>
+      <text x="435" y="94" text-anchor="middle" font-size="10.5" font-weight="700" fill="#4a4a55">harness.yml</text>
+      <text x="435" y="110" text-anchor="middle" font-size="9.5" fill="#7d8aa0">on.push.branches: [orca]</text>
+      <text x="435" y="124" text-anchor="middle" font-size="9.5" fill="#7d8aa0">on.pull_request: (mọi nhánh)</text>
+
+      <rect x="664" y="42" width="204" height="48" rx="8" fill="rgba(255,255,255,.7)" stroke="#34c759" stroke-width="1.6"/>
+      <text x="766" y="62" text-anchor="middle" font-size="10.5" font-weight="700" fill="#28a745">CI chạy</text>
+      <text x="766" y="78" text-anchor="middle" font-size="9.5" fill="#4a4a55">3 job, ~60 step</text>
+
+      <rect x="664" y="114" width="204" height="48" rx="8" fill="rgba(255,255,255,.7)" stroke="#ff2d55" stroke-width="1.6"/>
+      <text x="766" y="134" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e0264b">không job nào</text>
+      <text x="766" y="150" text-anchor="middle" font-size="9.5" fill="#4a4a55">local là cổng duy nhất</text>
+
+      <line x1="206" y1="42" x2="330" y2="90" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar5g)"/>
+      <line x1="206" y1="104" x2="330" y2="104" stroke="#ff2d55" stroke-width="2" class="flow" marker-end="url(#ar5)"/>
+      <line x1="206" y1="166" x2="330" y2="118" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar5g)"/>
+      <line x1="540" y1="92" x2="664" y2="66" stroke="#34c759" stroke-width="2" class="flow" marker-end="url(#ar5g)"/>
+      <line x1="540" y1="112" x2="664" y2="138" stroke="#ff2d55" stroke-width="2" class="flow" marker-end="url(#ar5)"/>
+    </svg>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <h4>1 · CI không gác nhánh <code>main</code> của fork</h4>
+      <p>Sửa một dòng là xong, nhưng nó đổi hành vi CI của repo (thêm lượt chạy trên mọi push), nên để người chủ quyết:</p>
+      <div class="code-wrap"><pre class="code-block"><span class="c"># .github/workflows/harness.yml</span>
+on:
+  pull_request:
+  push:
+    branches: [orca<span class="g">, main</span>]</pre></div>
+      <p>Trước khi đổi: đường PR đã có CI sẵn — nếu fork chuyển sang land qua PR thì món nợ này tự hết.</p>
+    </div>
+    <div class="card">
+      <h4>2 · Nhánh feature cũ của upstream</h4>
+      <p>Repo gốc còn ~30 nhánh, trong đó vài nhánh mang commit chưa nằm trong <code>orca</code>:</p>
+      <ul>
+        <li><code>Rheinmir/open-knowledge-format</code> · <code>Rheinmir/skill-spector</code> — mỗi nhánh 14 commit, dừng từ tháng 6.</li>
+        <li><code>master</code> (13) và <code>main</code> (5) — nhánh lịch sử, không phải nhánh phát triển.</li>
+        <li>Đợt này chỉ kéo <code>orca</code> — nhánh mặc định, nơi 106 commit mới thật sự nằm.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div><b>Nguồn ghi chép</b></div>
+  <div class="foot-tree">llmwiki/wiki/draft/cave/080926-merge-upstream-setup.md — bản ghi đầy đủ<br>
+  fdk/wiki/sources/evals/merge-fork-identity.md — golden eval<br>
+  fdk/wiki/sources/evals/merge-superset-conflict.md — golden eval<br>
+  llmwiki/html/080926-merge-upstream-setup.html — trang này</div>
+  <p style="margin-top:14px">Merge <code>e493ac29</code> · <a href="https://github.com/dragonwar000/stackoverflow">dragonwar000/stackoverflow</a> ← <a href="https://github.com/Rheinmir/setup">Rheinmir/setup@orca</a> · 08/09/2026</p>
+</footer>
+</main>
+
+<script>
+/* ── nav collapse ── */
+(function(){
+  var nav=document.querySelector('nav'); if(!nav) return;
+  var btn=document.createElement('button'); btn.className='nav-toggle'; btn.textContent='☰';
+  btn.setAttribute('aria-label','Mở điều hướng'); document.body.appendChild(btn);
+  var close=document.createElement('button'); close.className='nav-close'; close.textContent='✕';
+  close.setAttribute('aria-label','Đóng điều hướng'); nav.appendChild(close);
+  var apply=function(c){ document.body.classList.toggle('nav-collapsed',c);
+    try{ localStorage.setItem('navCollapsed', c?'1':'0'); }catch(e){} };
+  btn.addEventListener('click',function(){apply(false);});
+  close.addEventListener('click',function(){apply(true);});
+  try{ var s=localStorage.getItem('navCollapsed');
+    if(s==='1'||(s!=='0'&&matchMedia('(max-width:640px)').matches)) apply(true);
+  }catch(e){}
+})();
+
+/* ── theme switch ── */
+(function(){
+  var K='merge080926-theme', d=document.documentElement, nav=document.querySelector('nav'); if(!nav) return;
+  function isDark(){ var t=d.getAttribute('data-theme'); return t? t==='dark' : matchMedia('(prefers-color-scheme: dark)').matches; }
+  var sw=document.createElement('div'); sw.className='theme-switch';
+  sw.setAttribute('role','switch'); sw.setAttribute('tabindex','0');
+  sw.innerHTML='<span class="track"><span class="knob"></span></span>';
+  var row=document.createElement('div'); row.className='theme-row';
+  var lb=document.createElement('span'); lb.className='lbl'; lb.textContent='Giao diện';
+  row.appendChild(lb); row.appendChild(sw); nav.appendChild(row);
+  function paint(){ var dk=isDark(); sw.classList.toggle('on',dk); sw.setAttribute('aria-checked',dk?'true':'false');
+    sw.setAttribute('aria-label',dk?'Nút gạt giao diện: đang tối — gạt sang sáng':'Nút gạt giao diện: đang sáng — gạt sang tối'); }
+  function flip(){ var n=isDark()?'light':'dark'; d.setAttribute('data-theme',n);
+    try{ localStorage.setItem(K,n); }catch(e){} paint(); }
+  sw.addEventListener('click',flip);
+  sw.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); flip(); } });
+  paint();
+})();
+
+/* ── ripple trên nav + toggle ── */
+(function(){
+  function attach(el){
+    el.addEventListener('pointerdown',function(e){
+      var r=el.getBoundingClientRect();
+      var x=e.clientX-r.left, y=e.clientY-r.top;
+      var rad=Math.hypot(Math.max(x,r.width-x),Math.max(y,r.height-y));
+      var ink=document.createElement('span'); ink.className='ripple-ink';
+      ink.style.width=ink.style.height=rad*2+'px';
+      ink.style.left=(x-rad)+'px'; ink.style.top=(y-rad)+'px';
+      el.appendChild(ink);
+      ink.addEventListener('animationend',function(){ ink.remove(); });
+    });
+  }
+  document.querySelectorAll('nav a, .nav-toggle, .nav-close').forEach(attach);
+})();
+
+/* ── ripple toàn cục cho control khác ── */
+function initRipple(){
+  document.addEventListener('pointerdown',function(e){
+    var el=e.target.closest('button, .checklist label');
+    if(!el||el.dataset.noRipple) return;
+    if(el.closest('nav')||el.classList.contains('nav-toggle')) return;
+    var r=el.getBoundingClientRect();
+    var d=Math.max(r.width,r.height)*1.2;
+    var s=document.createElement('span'); s.className='ripple';
+    s.style.cssText='width:'+d+'px;height:'+d+'px;left:'+(e.clientX-r.left-d/2)+'px;top:'+(e.clientY-r.top-d/2)+'px';
+    if(getComputedStyle(el).position==='static') el.style.position='relative';
+    el.style.overflow='hidden';
+    el.appendChild(s);
+    s.addEventListener('animationend',function(){ s.remove(); });
+  });
+}
+initRipple();
+
+/* ── scrollbar flash ── */
+(function(){
+  var flash=function(el){ var t; return function(){ el.classList.add('scrolling'); clearTimeout(t);
+    t=setTimeout(function(){ el.classList.remove('scrolling'); },900); }; };
+  var root=document.documentElement;
+  window.addEventListener('scroll',flash(root),{passive:true});
+  var nav=document.querySelector('nav');
+  if(nav) nav.addEventListener('scroll',flash(nav),{passive:true});
+})();
+
+/* ── scroll spy ── */
+(function(){
+  var links=[].slice.call(document.querySelectorAll('nav a'));
+  var sections=[].slice.call(document.querySelectorAll('section[id]'));
+  if(!sections.length) return;
+  var observer=new IntersectionObserver(function(entries){
+    var active='';
+    entries.forEach(function(entry){ if(entry.isIntersecting) active=entry.target.id; });
+    if(active) links.forEach(function(a){ a.classList.toggle('active', a.getAttribute('href')==='#'+active); });
+  },{rootMargin:'-40% 0px -55% 0px'});
+  sections.forEach(function(s){ observer.observe(s); });
+})();
+
+/* ── mind map ── */
+(function(){
+  var mm=document.querySelector('.mm'); if(!mm) return; var NS='http://www.w3.org/2000/svg';
+  function colorOf(n){ return n.classList.contains('b-0')?'#30b0c7':n.classList.contains('b-1')?'#5856d6':
+    n.classList.contains('b-2')?'#ff9500':n.classList.contains('b-3')?'#34c759':n.classList.contains('b-4')?'#ff2d55':'#9aa4b2'; }
+  function draw(){
+    var canvas=mm.querySelector('.mm-canvas'), svg=mm.querySelector('.mm-links'); if(!canvas||!svg) return;
+    var w=canvas.offsetWidth, h=canvas.offsetHeight;
+    svg.setAttribute('width',w); svg.setAttribute('height',h); svg.setAttribute('viewBox','0 0 '+w+' '+h);
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    var cR=canvas.getBoundingClientRect();
+    [].slice.call(canvas.querySelectorAll('.node.has-children')).forEach(function(p){
+      var row=p.parentElement, kids=null, ch=row.children;
+      for(var i=0;i<ch.length;i++){ if(ch[i].classList.contains('children')) kids=ch[i]; }
+      if(!kids||kids.classList.contains('collapsed')) return;
+      var pr=p.getBoundingClientRect(), px=pr.right-cR.left, py=pr.top+pr.height/2-cR.top;
+      [].slice.call(kids.children).forEach(function(crow){
+        var cn=crow.querySelector(':scope > .node'); if(!cn) return;
+        var rr=cn.getBoundingClientRect(), cx=rr.left-cR.left, cy=rr.top+rr.height/2-cR.top;
+        var dx=Math.max(22,(cx-px)*0.55);
+        var pa=document.createElementNS(NS,'path');
+        pa.setAttribute('d','M'+px+' '+py+' C'+(px+dx)+' '+py+' '+(cx-dx)+' '+cy+' '+cx+' '+cy);
+        pa.setAttribute('stroke',colorOf(cn)); svg.appendChild(pa);
+      });
+    });
+  }
+  [].slice.call(mm.querySelectorAll('.node.has-children')).forEach(function(n){
+    var row=n.parentElement, kids=null, c=row.children;
+    for(var i=0;i<c.length;i++){ if(c[i].classList.contains('children')) kids=c[i]; }
+    if(!kids) return;
+    if(n.classList.contains('cat')){ kids.classList.add('collapsed'); n.classList.add('collapsed-parent'); }
+    n.addEventListener('click',function(e){ e.stopPropagation();
+      var open=kids.classList.toggle('collapsed'); n.classList.toggle('collapsed-parent',open); draw(); });
+  });
+  draw();
+  addEventListener('load',function(){ setTimeout(draw,60); });
+  addEventListener('resize',function(){ clearTimeout(window.__mmt); window.__mmt=setTimeout(draw,120); },{passive:true});
+})();
+
+/* ── collapse ── */
+(function(){
+  var t=document.getElementById('tgEval');
+  if(!t) return;
+  t.addEventListener('click',function(){
+    var body=document.getElementById('bodyEval');
+    var open=body.classList.toggle('open');
+    document.getElementById('arEval').classList.toggle('open');
+    body.style.maxHeight = open ? body.scrollHeight+'px' : '0';
+  });
+  addEventListener('resize',function(){
+    document.querySelectorAll('.collapse-body.open').forEach(function(b){ b.style.maxHeight=b.scrollHeight+'px'; });
+  });
+})();
+
+/* ── code copy ── */
+function initCodeCopy(){
+  var COPY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  document.querySelectorAll('pre.code-block').forEach(function(pre){
+    if(pre.dataset.copy) return; pre.dataset.copy='1';
+    var code=pre.textContent;
+    var wrap=pre.parentNode.classList.contains('code-wrap') ? pre.parentNode : (function(){
+      var w=document.createElement('div'); w.className='code-wrap';
+      pre.parentNode.insertBefore(w,pre); w.appendChild(pre); return w; })();
+    var btn=document.createElement('button'); btn.className='code-copy';
+    btn.setAttribute('aria-label','Copy'); btn.title='Copy'; btn.innerHTML=COPY;
+    wrap.appendChild(btn);
+    btn.addEventListener('click',function(){
+      var done=function(){ btn.innerHTML=CHECK; btn.classList.add('copied');
+        setTimeout(function(){ btn.innerHTML=COPY; btn.classList.remove('copied'); },1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(done,done); }
+      else { var ta=document.createElement('textarea'); ta.value=code; document.body.appendChild(ta);
+        ta.select(); try{ document.execCommand('copy'); }catch(e){} ta.remove(); done(); }
+    });
+  });
+}
+initCodeCopy();
+
+/* ── draggable diagrams ── */
+function initDraggableDiagrams(){
+  var NS='http://www.w3.org/2000/svg';
+  var nearest=function(nodes,x,y){
+    var best=null,bd=1e9;
+    nodes.forEach(function(n){
+      var cx=Math.max(n.x,Math.min(x,n.x+n.w)), cy=Math.max(n.y,Math.min(y,n.y+n.h));
+      var d=Math.hypot(x-cx,y-cy);
+      if(d<bd){ bd=d; best=n; }
+    });
+    return bd<=42?best:null;
+  };
+  document.querySelectorAll('.diagram-box').forEach(function(box){
+    var svg=box.querySelector('svg');
+    if(!svg||box.dataset.draggable) return;
+    box.dataset.draggable='1';
+    var vp=document.createElement('div'); vp.className='diagram-viewport';
+    box.insertBefore(vp,svg); vp.appendChild(svg);
+    var hint=document.createElement('div'); hint.className='diagram-hint';
+    hint.textContent='✥ kéo từng ô · kéo nền để pan · cuộn để zoom · kéo mép dưới để mở rộng';
+    box.appendChild(hint);
+    var reset=document.createElement('button'); reset.className='diagram-reset'; reset.textContent='⟲ reset';
+    box.appendChild(reset);
+
+    var allRects=[].slice.call(svg.querySelectorAll('rect'));
+    var nodes=allRects.filter(function(r){ return (+r.getAttribute('width'))>=70 && (+r.getAttribute('height'))>=30; })
+      .map(function(r){ return { rect:r, x:+r.getAttribute('x'), y:+r.getAttribute('y'),
+        w:+r.getAttribute('width'), h:+r.getAttribute('height'), els:[r], tx:0, ty:0 }; });
+    var inNode=function(px,py){ return nodes.find(function(n){
+      return px>=n.x-1 && px<=n.x+n.w+1 && py>=n.y-1 && py<=n.y+n.h+1; }); };
+    [].slice.call(svg.querySelectorAll('text')).forEach(function(t){
+      var x=parseFloat(t.getAttribute('x')), y=parseFloat(t.getAttribute('y'));
+      if(isNaN(x)||isNaN(y)) return; var n=inNode(x,y); if(n) n.els.push(t);
+    });
+    allRects.forEach(function(r){
+      if(nodes.some(function(n){ return n.rect===r; })) return;
+      var x=+r.getAttribute('x'), y=+r.getAttribute('y'), w=+r.getAttribute('width')||0, h=+r.getAttribute('height')||0;
+      var n=inNode(x+w/2,y+h/2); if(n) n.els.push(r);
+    });
+    nodes.forEach(function(n){
+      var g=document.createElementNS(NS,'g'); g.setAttribute('class','dnode');
+      n.rect.parentNode.insertBefore(g,n.rect);
+      n.els.forEach(function(el){ g.appendChild(el); });
+      n.g=g;
+    });
+
+    var links=[].slice.call(svg.querySelectorAll('line')).filter(function(l){ return l.hasAttribute('x1')&&l.hasAttribute('x2'); });
+    links.forEach(function(l){
+      l._x1=+l.getAttribute('x1'); l._y1=+l.getAttribute('y1');
+      l._x2=+l.getAttribute('x2'); l._y2=+l.getAttribute('y2');
+      l._n1=nearest(nodes,l._x1,l._y1); l._n2=nearest(nodes,l._x2,l._y2);
+    });
+    var reroute=function(){ links.forEach(function(l){
+      if(l._n1){ l.setAttribute('x1',l._x1+l._n1.tx); l.setAttribute('y1',l._y1+l._n1.ty); }
+      if(l._n2){ l.setAttribute('x2',l._x2+l._n2.tx); l.setAttribute('y2',l._y2+l._n2.ty); }
+    }); };
+
+    var vbBase=(svg.getAttribute('viewBox')||'0 0 900 200').split(/\s+/).map(Number);
+    var fitViewBox=function(){
+      var pad=16;
+      var minX=vbBase[0], minY=vbBase[1], maxX=vbBase[0]+vbBase[2], maxY=vbBase[1]+vbBase[3];
+      nodes.forEach(function(n){
+        minX=Math.min(minX,n.x+n.tx-pad); minY=Math.min(minY,n.y+n.ty-pad);
+        maxX=Math.max(maxX,n.x+n.w+n.tx+pad); maxY=Math.max(maxY,n.y+n.h+n.ty+pad);
+      });
+      svg.setAttribute('viewBox',minX+' '+minY+' '+(maxX-minX)+' '+(maxY-minY));
+    };
+
+    var ptx=0,pty=0,scale=1;
+    var applyCanvas=function(){ svg.style.transform='translate('+ptx+'px,'+pty+'px) scale('+scale+')'; };
+    var toSvg=function(cx,cy){ var p=svg.createSVGPoint(); p.x=cx; p.y=cy; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+    var mode=null,node=null,start=null,t0=null,p0=null;
+    vp.addEventListener('pointerdown',function(e){
+      vp.setPointerCapture(e.pointerId);
+      var g=e.target.closest&&e.target.closest('g.dnode');
+      if(g){ mode='node'; node=nodes.find(function(n){ return n.g===g; });
+        start=toSvg(e.clientX,e.clientY); t0={x:node.tx,y:node.ty}; }
+      else { mode='pan'; p0={x:e.clientX-ptx,y:e.clientY-pty}; vp.classList.add('grabbing'); }
+    });
+    vp.addEventListener('pointermove',function(e){
+      if(mode==='node'){ var c=toSvg(e.clientX,e.clientY);
+        node.tx=t0.x+(c.x-start.x); node.ty=t0.y+(c.y-start.y);
+        node.g.setAttribute('transform','translate('+node.tx+','+node.ty+')'); reroute(); }
+      else if(mode==='pan'){ ptx=e.clientX-p0.x; pty=e.clientY-p0.y; applyCanvas(); }
+    });
+    var end=function(){ if(mode==='node') fitViewBox(); mode=null; node=null; vp.classList.remove('grabbing'); };
+    vp.addEventListener('pointerup',end); vp.addEventListener('pointercancel',end);
+    vp.addEventListener('wheel',function(e){
+      e.preventDefault();
+      var r=vp.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+      var ns=Math.min(4,Math.max(0.5,scale*(e.deltaY<0?1.1:0.9)));
+      ptx=mx-(mx-ptx)*(ns/scale); pty=my-(my-pty)*(ns/scale); scale=ns; applyCanvas();
+    },{passive:false});
+    var doReset=function(){
+      ptx=0; pty=0; scale=1;
+      svg.style.transition='transform .3s cubic-bezier(.4,0,.2,1)'; applyCanvas();
+      setTimeout(function(){ svg.style.transition=''; },320);
+      nodes.forEach(function(n){ n.tx=0; n.ty=0; n.g.setAttribute('transform','translate(0,0)'); });
+      reroute(); fitViewBox();
+    };
+    reset.addEventListener('click',doReset);
+    vp.addEventListener('dblclick',doReset);
+  });
+}
+initDraggableDiagrams();
+</script>
+</body>
+</html>
