@@ -135,6 +135,13 @@ def defines_symbol(line: str, name: str) -> bool:
     return any(re.search(p, line) for p in pats)
 
 
+# Cache theo tien trinh. Hook la tien trinh ngan, nhung MOT tai lieu co the mang 10 la
+# code-line — quet lai ca cay cho tung la la cho hong hieu nang do duoc: 1.07s/lan x 10 la
+# = 10.7s, du de day install-harness tu <5s len 14-20s va lam do rao `idempotent toc do`.
+_FILES_CACHE: dict = {}
+_DEFINES_CACHE: dict = {}
+
+
 def _repo_defines(name: str, root: Path):
     """`name` co duoc DINH NGHIA o dau do trong repo khong. Tra True/False/None(khong tra duoc).
 
@@ -145,9 +152,17 @@ def _repo_defines(name: str, root: Path):
     Quet bang `re` cua PYTHON, KHONG shell ra `grep -E`. Ly do do duoc 2026-09-08: pattern duoi
     day la PCRE (`(?:...)`), ma `grep -E` an ERE. BSD grep (macOS) nuot duoc nen local xanh; GNU
     grep (Linux/CI) tra rc=2 "Invalid preceding regular expression" -> ham nay tra None -> nhanh
-    doi chieu "khai sdk_doc cho ham CO trong repo" CHET CAM tren Linux ma khong ai thay. Chay
-    regex trong Python bo han van de phuong ngu regex, va giu duoc dung mot ban pattern.
+    doi chieu "khai sdk_doc cho ham CO trong repo" CHET CAM tren Linux ma khong ai thay.
+
+    Ba lop cat gia thanh, vi bo `grep` (C, doc theo khoi) doi lai bang Python thi mat toc do:
+      1. cache danh sach file + cache ket qua theo (root, name);
+      2. doc BYTES, khong decode ca file — decode chi de lai cho file thuc su co ten do;
+      3. tien-loc bang `bytes.find` (memchr) truoc khi chay regex.
     """
+    key = (str(root), name)
+    if key in _DEFINES_CACHE:
+        return _DEFINES_CACHE[key]
+
     n = re.escape(name)
     try:
         rx = re.compile(
@@ -158,18 +173,29 @@ def _repo_defines(name: str, root: Path):
     except re.error:
         return None
 
-    files = _candidate_files(root)
+    files = _FILES_CACHE.get(str(root))
+    if files is None:
+        files = _candidate_files(root)
+        _FILES_CACHE[str(root)] = files
     if files is None:
         return None
+
+    needle = name.encode("utf-8", "ignore")
+    out = False
     for f in files:
         try:
             if f.stat().st_size > _SCAN_MAX_BYTES:
                 continue
-            if rx.search(f.read_text(encoding="utf-8", errors="ignore")):
-                return True
+            data = f.read_bytes()
         except OSError:
             continue
-    return False
+        if needle not in data:            # tien-loc: khong co ten thi khong the co dinh nghia
+            continue
+        if rx.search(data.decode("utf-8", "ignore")):
+            out = True
+            break
+    _DEFINES_CACHE[key] = out
+    return out
 
 
 # Tran quet: du rong cho repo that, du hep de khong bien mot validator thanh mot vong quet dia.
