@@ -2,6 +2,7 @@
 
 | File | Type | Summary |
 |------|------|---------|
+| [overstack-artifact-root](concepts/overstack-artifact-root.md) | concept | `.overstack/` một gốc cho artifact sinh/kéo về + PATH_MIGRATIONS tự dời downstream + dym-sync (bundle dạng skill, drift với dym, /dym định tuyến theo domain) |
 | [frontier-gap-scan](concepts/frontier-gap-scan.md) | concept | Quét đối thủ hàng tuần để overstack là frontier TOÀN DIỆN — baseline 03/07 + runbook scout + 5 issue gap |
 | [query-retrieval-eval](concepts/query-retrieval-eval.md) | concept | Đo TRUY HỒI của skill query (hit@k+token), telemetry + query 3-tầng L0→L1, −65% token giữ recall |
 | [design-pattern-v1](sources/design-pattern-v1.md) | source | Học Từ Thiền Phần 000 — System Design fundamentals · Phan Văn Ngọc Thắng |
@@ -67,6 +68,8 @@
 | [capproof-liveness](sources/evals/capproof-liveness.md) | eval | Golden: capproof-liveness |
 | [map-not-territory](concepts/map-not-territory.md) | concept | map-not-territory — tìm unknowns trước khi prompt |
 | [artifact-selfpath-relative](sources/evals/artifact-selfpath-relative.md) | eval | Golden: artifact-selfpath-relative |
+| [merge-fork-identity](sources/evals/merge-fork-identity.md) | eval | Golden: merge-fork-identity |
+| [merge-superset-conflict](sources/evals/merge-superset-conflict.md) | eval | Golden: merge-superset-conflict |
 <!-- index:auto:end -->
 | [harness-local](concepts/harness-local.md) | concept | harness-local — harness RIÊNG của dự án |
 | [ADR-011-project-local-harness](sources/adr/ADR-011-project-local-harness.md) | source | "ADR-011: project-local harness — dự án tự phát triển rule riêng (P-namespace, sandbox-safe)" |

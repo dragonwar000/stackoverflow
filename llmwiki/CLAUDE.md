@@ -22,7 +22,7 @@ Trước khi sửa hay xây bất cứ thứ gì, hỏi **"vì sao"** cho tới 
 
 ## Chứng cứ trong CHAT — opt-in qua `/graph-mode`, không auto-bơm mỗi phiên
 
-Luật chuỗi-lập-luận-phải-chạm-chứng-cứ (6 loại điểm cuối, chi tiết [[evidence-terminal-chain]])
+Luật chuỗi-lập-luận-phải-chạm-chứng-cứ (7 loại điểm cuối, chi tiết [[evidence-terminal-chain]])
 GIỜ nằm ở `skills/graph-mode/SKILL.md`, không còn bơm mặc định vào mọi phiên — kỷ luật này buộc
 trích dẫn/mở file nhiều hơn mỗi câu trả lời (nặng token), nên chỉ bật khi thật cần độ tin cậy cao
 (audit, ADR, chẩn đoán lan rộng). Gọi `/graph-mode` để bật, "tắt graph mode"/"normal mode" để tắt.
@@ -86,7 +86,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `orca-issue` | Sự cố/bug/regression — vòng repro-first → fix red→green → distill kép | `skills/orchestrate/orca-issue.md` | orchestrate |
 | `wayfinder` | Việc QUÁ LỚN một phiên & còn mù mờ — bản đồ ticket QUYẾT ĐỊNH (fog of war/frontier/out-of-scope), giải từng cái tới khi đường rõ. TRƯỚC /propose. Chỉ-gọi-tay | `skills/orchestrate/wayfinder.md` | orchestrate |
 | `onboard-codebase` | Deep analysis of legacy code to populate Wiki | `skills/dev-loop/onboard-codebase.md` | dev-loop |
-| `doyourmagic` | Freshly-cloned external repo/tool → clone→explore→analysis→write-workflows, sinh bộ `doyourmagic/<repo-name>/workflows.md` + `index.html` chạy được ngay. KHÁC `onboard-codebase` (phân tích DỰ ÁN CHÍNH → wiki nội bộ, không phải tool ngoài) | `skills/dev-loop/doyourmagic.md` | dev-loop |
+| `doyourmagic` | Freshly-cloned external repo/tool → clone→explore→analysis→write-workflows, sinh bộ `.overstack/doyourmagic/<repo-name>/workflows.md` + `index.html` chạy được ngay. KHÁC `onboard-codebase` (phân tích DỰ ÁN CHÍNH → wiki nội bộ, không phải tool ngoài) | `skills/dev-loop/doyourmagic.md` | dev-loop |
 | `sync-template` | Upstreaming template improvements to master repo | `skills/utils/sync-template.md` | utils |
 | `md-to-html` | User wants to render a professional HTML report | `skills/utils/md-to-html.md` | utils |
 | `docs-site-macos` | User wants macOS-style documentation site | `skills/utils/docs-site-macos.md` | utils |
@@ -107,6 +107,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `frontier-scan` | Quét đối thủ + đối chiếu overstack 8 trục (gọi instant) — "frontier scan", "chúng ta thua gì" | `skills/utils/frontier-scan.md` | utils |
 | `brandkit` | Premium brand-kit image generation skill for creating high-end… | `skills/utils/brandkit.md` | utils |
 | `hallmark` | **NỀN design mặc định** (Together AI) — 6 discipline + 57 cổng slop-test, từ chối trông AI-generated. Mọi UI đứng trên nó; skill taste khác là flavour. 4 verb: build/audit/redesign/study. Xem [[design-foundation]] | `skills/utils/hallmark.md` | utils |
+| `prd-grade-fe` | Pipeline MỘT CỬA ra frontend chuẩn production có cổng máy gác: interview nguồn theme (A macOS glass · B tài liệu · C URL) → khoá vào `design.md` (hallmark + impeccable đọc chung) → build token-only → `fe-gate.sh` (impeccable detect + 4 viewport) + rubric audit/harden/polish → mới giao. Đứng TRÊN hallmark, thêm gate | `skills/utils/prd-grade-fe.md` | utils |
 | `diagram` | Vẽ SƠ ĐỒ (hộp+mũi tên) và BIỂU ĐỒ (số liệu) bằng máy — router tới `archify` cho sơ đồ, `dataviz` + kỷ luật lieflat cho biểu đồ; model điền tờ khai, code dựng hình, cổng soi hình học rồi mới giao | `skills/utils/diagram.md` | utils |
 | `build-now-adapt-later` | When a task is blocked by missing or unverified information (an… | `skills/dev-loop/build-now-adapt-later.md` | dev-loop |
 | `cavecrew` | Decision guide for delegating to caveman-style subagents. | `skills/utils/cavecrew.md` | utils |

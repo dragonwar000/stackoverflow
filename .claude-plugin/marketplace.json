@@ -67,6 +67,7 @@
         "./skills/gpt-taste",
         "./skills/graph-mode",
         "./skills/hallmark",
+        "./skills/prd-grade-fe",
         "./skills/harness-tour",
         "./skills/harness-update",
         "./skills/health-check",
@@ -120,6 +121,13 @@
         "./skills/wiki-room",
         "./skills/wikieval"
       ]
+    },
+    {
+      "name": "overstack-budget-statusline",
+      "displayName": "Overstack Budget Statusline",
+      "description": "Status bar % trần token/$/model-call/tool-call của overstack + cửa sổ ngữ cảnh sống + mốc auto-handover",
+      "source": "./plugins/overstack-budget-statusline",
+      "license": "MIT"
     }
   ]
 }
