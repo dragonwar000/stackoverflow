@@ -101,7 +101,7 @@ Chọn A vì nó sửa đúng chỗ bị lệch (hai nghĩa của một cờ, v�
 - File công tắc cục bộ là `.llmwiki/features.local.yaml`, không commit, đặt trong thư mục overstack của dự án (default).
 - Cờ lần chạy là tham số `--feature <id>=<on|off>` của script chạy hook, chỉ có hiệu lực trong một lần chạy (default).
 - Các biến `OVERSTACK_EVIDENCE_TERMINAL`, `OVERSTACK_GOAL_HOOK`, `OVERSTACK_WIKIGRAPH` được giữ làm alias của công tắc tương ứng. Giá trị mặc định là giá trị hiện tại trong code (default).
-- Quy tắc thống nhất cho `OVERSTACK_WIKIGRAPH` là: graph bật khi có stamp hoặc khi env là `1`, và nhắc khi graph bật. Quy tắc này khớp với hành vi `stop.py` hiện tại (default, cần xác nhận).
+- Quy tắc cho `OVERSTACK_WIKIGRAPH` (người duyệt đã chọn phương án A, 03/10/2026): giữ mặc định của từng bên. Không có env và không có công tắc cục bộ: `stop.py` bật theo stamp, còn nhắc (`session_start.py`) chỉ khi `env=1`. `env=1` hoặc bật tường minh: cả hai bật, như cũ. `env=0` hoặc tắt tường minh (`feature-switch off wikigraph`): cả hai tắt. Đây là năng lực mới, vì hiện nay `env=0` bị bỏ qua ở đường Stop. Mặc định không đổi, nên không dự án nào nhận lời nhắc mới.
 
 ## Agent Task Assignment
 
