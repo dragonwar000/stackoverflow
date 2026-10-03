@@ -97,3 +97,7 @@ llmwiki/wiki/sources/draft/230926-nightshift-*
 llmwiki/wiki/sources/draft/230926-overnight-loop-PRD.md
 llmwiki/wiki/sources/draft/230926-rie-*
 llmwiki/wiki/sources/draft/240926-intent-manifest-ui-*
+# công tắc cục bộ của dự án (feature-switch) và nhật ký tắt/bật — không commit
+llmwiki/features.local.yaml
+.llmwiki/features.local.yaml
+harness/metrics/feature-switch.jsonl

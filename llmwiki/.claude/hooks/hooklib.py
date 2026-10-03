@@ -165,6 +165,101 @@ def harness_dir(root: str) -> pathlib.Path:
     fw = (pathlib.Path(root) / "fdk" / "wiki").is_dir()
     return pathlib.Path(root) / ("harness" if fw else ".harness")
 
+# ── Công tắc harness: danh mục harness/features.yaml + một cách đọc duy nhất ──
+FEATURE_REGISTRY_FILE = "features.yaml"
+LOCAL_FEATURES_FILE = "features.local.yaml"
+# Guardrail: vẫn BẬT khi registry thiếu/lỗi (FR-004). Chỉ file cục bộ được tắt.
+GUARDRAIL_FALLBACK = ("egress-guard", "orca-guard", "inject-scan")
+_YAML_WARNED = False
+
+
+def _read_yaml(path) -> dict:
+    global _YAML_WARNED
+    try:
+        import yaml
+    except ImportError:
+        if not _YAML_WARNED:
+            _YAML_WARNED = True
+            print("[hooklib] thiếu PyYAML — công tắc đọc từ config/registry dùng mặc định", file=sys.stderr)
+        return {}
+    try:
+        data = yaml.safe_load(pathlib.Path(path).read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _as_bool(v):
+    s = str(v).strip().lower()
+    if s in ("on", "1", "true", "yes"):
+        return True
+    if s in ("off", "0", "false", "no"):
+        return False
+    return None
+
+
+def feature_registry(root: str) -> dict:
+    """Mục `features` của harness/features.yaml (qua harness_dir). Thiếu hoặc lỗi → {}."""
+    return _read_yaml(harness_dir(root) / FEATURE_REGISTRY_FILE).get("features") or {}
+
+
+def _argv_flag(argv, fid):
+    for i, tok in enumerate(argv):
+        if tok == "--feature" and i + 1 < len(argv) and argv[i + 1].startswith(fid + "="):
+            return _as_bool(argv[i + 1].split("=", 1)[1])
+    return None
+
+
+def _is_guardrail(fid, spec) -> bool:
+    return fid in GUARDRAIL_FALLBACK or (spec or {}).get("class") == "guardrail"
+
+
+def feature_on(root: str, fid: str, default=None, argv=None, env=None):
+    """Trả (bật?, tầng nguồn). Thứ tự: cờ --feature > env OVERSTACK_FEATURE_<ID> > env cũ (legacy_env)
+    > features.local.yaml > config của công tắc > default (tham số, rồi registry, rồi BẬT).
+    Guardrail: chỉ file cục bộ được tắt; mọi nguồn khác bị bỏ qua. Lỗi bất kỳ → guardrail BẬT,
+    feature trả default; không chặn hook."""
+    env = os.environ if env is None else env
+    argv = list(argv or [])
+    guard = fid in GUARDRAIL_FALLBACK
+    try:
+        spec = feature_registry(root).get(fid) or {}
+        guard = _is_guardrail(fid, spec)
+        fb = default if default is not None else _as_bool(spec.get("default"))
+        if fb is None:
+            fb = True
+        if not guard:
+            v = _argv_flag(argv, fid)
+            if v is not None:
+                return v, "cờ --feature"
+            key = "OVERSTACK_FEATURE_" + fid.upper().replace("-", "_")
+            if key in env:
+                v = _as_bool(env[key])
+                if v is not None:
+                    return v, f"env {key}"
+            le = spec.get("legacy_env")
+            if le and le in env:
+                raw = str(env[le]).strip().lower()
+                if raw in [str(x).lower() for x in (spec.get("legacy_off") or [])]:
+                    return False, f"env {le}"
+                if raw in [str(x).lower() for x in (spec.get("legacy_on") or [])]:
+                    return True, f"env {le}"
+        od = overstack_dir(root)
+        if od is not None:
+            v = _as_bool(_read_yaml(od / LOCAL_FEATURES_FILE).get(fid))
+            if v is not None:
+                return v, f"file cục bộ {LOCAL_FEATURES_FILE}"
+        if not guard and spec.get("config_file") and spec.get("config_key"):
+            v = _as_bool(_read_yaml(pathlib.Path(root) / spec["config_file"]).get(spec["config_key"]))
+            if v is not None:
+                return v, f"config {spec['config_file']}"
+        return fb, "mặc định"
+    except Exception:
+        if guard:
+            return True, "lỗi đọc công tắc"
+        return (True if default is None else default), "lỗi đọc công tắc"
+
+
 def stamp_path(root: str):
     d = overstack_dir(root)
     if d and (d / ".harness-stamp").is_file():

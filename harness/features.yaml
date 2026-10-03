@@ -1,0 +1,60 @@
+# harness/features.yaml — danh mục công tắc của harness. Nguồn duy nhất cho hooklib.feature_on.
+# class: guardrail (chỉ tắt qua file cục bộ + --acknowledge-guardrail) | gate (tắt qua env/config,
+#        có stderr + nhật ký) | feature (tắt tự do).
+# consumer: nơi công tắc được gác. null = chưa gắn vào hook nào: tắt bị từ chối để không no-op im lặng.
+# default: "on"/"off" hoặc "stamp" (caller quyết theo stamp dự án — feature_on không tự resolve "stamp").
+# Guardrail cố định trong hooklib.GUARDRAIL_FALLBACK (egress-guard, orca-guard, inject-scan) vẫn là guardrail
+# khi registry thiếu/lỗi (FR-004).
+version: 1
+features:
+  wikigraph:
+    class: feature
+    doc: Tự vẽ wiki-graph.html ở Stop; nhắc khi vector thiếu ở SessionStart.
+    default: stamp
+    legacy_env: OVERSTACK_WIKIGRAPH
+    legacy_on: ["1"]
+    # env=0 tắt được là hành vi MỚI có chủ ý (SPEC 031026-harness-feature-switches, phương án A):
+    # tắt tường minh thì tắt cả hai bên (stamp lẫn opt-in). Hôm nay stop.py không đọc "0".
+    legacy_off: ["0"]
+    consumer: llmwiki/.claude/hooks/stop.py
+  goal-hook:
+    class: feature
+    doc: Chỉ thị /orca-graph khi prompt có từ khoá goal.
+    default: "on"
+    legacy_env: OVERSTACK_GOAL_HOOK
+    legacy_off: ["0"]
+    consumer: llmwiki/.claude/hooks/user_prompt_submit.py
+  self-report:
+    class: feature
+    doc: Tự chấm hệ mỗi N lượt. OVERSTACK_SELF_REPORT_EVERY là số, không phải công tắc.
+    default: "on"
+    consumer: null
+  agent-trace:
+    class: feature
+    doc: Sổ kiểm chứng agent. Mặc định TẮT khi không có config (repo hiện có config enabled true).
+    default: "off"
+    config_file: harness/agent-trace.config.yaml
+    config_key: enabled
+    consumer: harness/scripts/agent-trace.py
+  evidence-terminal:
+    class: gate
+    doc: R19 — chuỗi kết luận phải chạm chứng cứ.
+    default: "on"
+    # Không có legacy_on: hôm nay env=1 không thắng config enabled:false (validator chỉ nhận 0/false/off).
+    legacy_env: OVERSTACK_EVIDENCE_TERMINAL
+    legacy_off: ["0", "false", "off"]
+    config_file: harness/evidence-terminal.config.yaml
+    config_key: enabled
+    consumer: llmwiki/.claude/hooks/validators/evidence_terminal.py
+  egress-guard:
+    class: guardrail
+    doc: Chặn network-egress ngoài allow-list (mode warn/block ở harness/egress-guard.config.yaml).
+    consumer: llmwiki/.claude/hooks/pre_tool_use.py
+  orca-guard:
+    class: guardrail
+    doc: Chặn lệnh Bash sai của orchestration.
+    consumer: llmwiki/.claude/hooks/orca_guard.py
+  inject-scan:
+    class: guardrail
+    doc: Quét prompt injection (harness/scripts/inject-scan.py). Chưa có điểm gác trong hook.
+    consumer: null
