@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 
-from hooklib import running_servers, servers_message, audit, code_log, find_validators, harness_dir, overstack_dir, project_dir, read_payload, resolve_tool, run_validator, scope_config, stamp_path, session_touched_files, touched_message, session_new_html, new_html_message, session_graphs, graphs_message
+from hooklib import running_servers, servers_message, audit, code_log, find_validators, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, run_validator, scope_config, stamp_path, session_touched_files, touched_message, session_new_html, new_html_message, session_graphs, graphs_message
 
 
 # file code (đa ngôn ngữ) trong git-status → trigger regen phần code-graph của wiki-graph.
@@ -171,6 +171,18 @@ def regen_docs(root: str) -> None:
         pass
 
 
+def zeromem_write(root: str, session: str, tp: str) -> None:
+    """Ghi turn của phiên vào store zeromem của project, qua bridge → zm hook. Fail-open, theo ngân sách Stop."""
+    zb = resolve_tool(root, "harness/scripts/zeromem-bridge.py")  # bare-path: ok — rel khung framework, resolve_tool map sang global ~/.claude/harness/harness/scripts
+    if not zb or not tp:
+        return
+    try:
+        _run([sys.executable, zb, "ingest", "--root", root, "--session", session, "--transcript", tp],
+             cwd=root, capture_output=True, timeout=12)
+    except Exception:
+        pass
+
+
 def secondary_memory(root: str, session: str) -> None:
     """Chốt 1+2 (council-030, issue #5): nối bộ-nhớ-thứ-cấp vào chính Stop-hook đang ghi ledger,
     để context/sửa-vụn được lưu durable + visualizable mà KHÔNG cần agent nhớ gõ tay (leverage
@@ -211,7 +223,7 @@ def secondary_memory(root: str, session: str) -> None:
     except Exception:
         pass
     mr = resolve_tool(root, "harness/scripts/mem-rank.py")
-    if mr:
+    if mr and memory_backend(root) in ("mem-rank", "both"):
         try:
             subject = _run(["git", "log", "-1", "--format=%s"], cwd=root,
                                       capture_output=True, text=True, timeout=8).stdout.strip()
@@ -428,6 +440,7 @@ def main() -> None:
     # dựng wiki-graph + overstack (overstack NHÚNG memory-map). Thứ tự cũ ngược lại nên
     # overstack luôn ôm bản memory-map cũ và medic báo "docs CŨ so đĩa" ở MỌI phiên —
     # một cảnh báo đúng nhưng vô phương sửa bằng cách chạy lại generator.
+    zeromem_write(root, (payload.get("session_id") or ""), tp or "")
     secondary_memory(root, (payload.get("session_id") or ""))  # issue #5: bộ-nhớ-thứ-cấp tự lưu context vụn cuối lượt
     regen_docs(root)               # overstack.html + CAPABILITIES tự cập nhật khi skill/rule đổi (repo framework)
     dym_drift_mirror(root)  # T2b: bundle tool ngoài lệch kho dym → nhắc, không chặn

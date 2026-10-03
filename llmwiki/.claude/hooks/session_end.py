@@ -99,11 +99,28 @@ def snapshot_ledgers(root: pathlib.Path) -> None:
         pass
 
 
+def zeromem_write(root: str, session: str, tp: str) -> None:
+    """Ghi turn của phiên vào store zeromem của project, qua bridge → zm hook. Fail-open, timeout 12s.
+
+    Bản copy của stop.py (không import chéo giữa hooks). Không dùng _run() vì module này không có ngân sách Stop.
+    """
+    from hooklib import resolve_tool  # cục bộ: import đầu file không có resolve_tool
+    zb = resolve_tool(root, "harness/scripts/zeromem-bridge.py")  # bare-path: ok — rel khung framework, resolve_tool map sang global ~/.claude/harness/harness/scripts
+    if not zb or not tp:
+        return
+    try:
+        subprocess.run([sys.executable, zb, "ingest", "--root", root, "--session", session, "--transcript", tp],
+                       cwd=root, capture_output=True, timeout=12)
+    except Exception:
+        pass
+
+
 def main() -> None:
     payload = read_payload()
     audit(payload, "SessionEnd")
 
     root = pathlib.Path(project_dir(payload))
+    zeromem_write(str(root), (payload.get("session_id") or ""), payload.get("transcript_path") or "")
     flush_problem_tree(root, payload.get("session_id", ""))
     snapshot_ledgers(root)
     wiki = find_wiki_dir(str(root))

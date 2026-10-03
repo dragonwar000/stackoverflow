@@ -34,6 +34,8 @@ jobs:
         run: bash harness/tests/zeromem-install-test.sh .
       - name: zeromem-bridge — recall loại phiên hiện tại, fail-open khi thiếu zm (fake zm)
         run: bash harness/tests/zeromem-bridge-test.sh .
+      - name: zeromem-hooks — SessionStart recall zeromem, mem-rank không đổi (fake zm)
+        run: bash harness/tests/zeromem-hooks-test.sh .
 
   validate-content:
     name: validate file .md đổi (layer=repo)

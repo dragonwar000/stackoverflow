@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hooklib import HARNESS_HOME, audit, find_wiki_dir, harness_dir, overstack_dir, project_dir, read_payload, resolve_tool, stamp_path
+from hooklib import HARNESS_HOME, audit, find_wiki_dir, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, stamp_path
 from hooklib import orca_graph_running as hooklib_orca_graph_running
 
 
@@ -220,6 +220,31 @@ def orient(root: Path) -> None:
         pass
 
 
+def _zeromem_recall(root: Path, sid: str, backend: str) -> None:
+    """Đầu phiên: recall zeromem theo subject commit gần nhất, tối đa 3 dòng, loại phiên hiện tại.
+
+    Fail-open: thiếu bridge, thiếu zm, timeout đều im lặng. Chạy khi backend là zeromem hoặc both.
+    """
+    if backend not in ("zeromem", "both"):
+        return
+    zb = resolve_tool(str(root), "harness/scripts/zeromem-bridge.py")  # bare-path: ok — rel khung framework, resolve_tool map sang global ~/.claude/harness/harness/scripts
+    if not zb:
+        return
+    try:
+        subj = subprocess.run(["git", "log", "-1", "--format=%s"], cwd=str(root),
+                              capture_output=True, text=True, timeout=5).stdout.strip()
+        if not subj:
+            return
+        out = subprocess.run([sys.executable, zb, "recall", "--root", str(root), "--query", subj,
+                              "--exclude-session", sid, "--top-k", "3"],
+                             cwd=str(root), capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:
+        return
+    if out:
+        print("Trí nhớ zeromem (liên quan việc gần nhất):")
+        print(out)
+
+
 def recall(root: Path, sid: str = "") -> None:
     """Đầu phiên: in CHUỖI vài phiên gần nhất (mem-rank chain) vào context.
 
@@ -231,6 +256,10 @@ def recall(root: Path, sid: str = "") -> None:
 
     Rẻ và tất định: đọc một file JSONL, in tối đa 3 dòng, 0 token LLM. Fail-open tuyệt đối.
     """
+    backend = memory_backend(str(root))
+    _zeromem_recall(root, sid, backend)
+    if backend == "zeromem":
+        return
     try:
         mr = resolve_tool(str(root), "harness/scripts/mem-rank.py")
         if not mr:
