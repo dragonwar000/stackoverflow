@@ -32,6 +32,8 @@ jobs:
         run: bash harness/tests/memory-map-user-reachability-test.sh .
       - name: zeromem-install — kiểm sha256 model theo lock
         run: bash harness/tests/zeromem-install-test.sh .
+      - name: zeromem-bridge — recall loại phiên hiện tại, fail-open khi thiếu zm (fake zm)
+        run: bash harness/tests/zeromem-bridge-test.sh .
 
   validate-content:
     name: validate file .md đổi (layer=repo)
