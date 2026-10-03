@@ -11,6 +11,7 @@ version: 1
 rules:
   no_write_raw:
     id: R1
+    switch: guardrail
     name: no-write-raw
     kind: deny_write
     statement: "raw/ là inbox của con người — agent chỉ được đọc, không ghi."
@@ -21,6 +22,7 @@ rules:
 
   require_origin:
     id: R2
+    switch: gate
     name: origin-required
     kind: require_section
     statement: "Mọi wiki content file phải có section '## Origin' để truy được nguồn gốc."
@@ -38,6 +40,7 @@ rules:
 
   folder_structure:
     id: R5
+    switch: gate
     name: folder-structure
     kind: forbid_root
     statement: "File wiki phải nằm trong concepts/entities/sources/draft/architecture/tours — KHÔNG ở wiki/ root."
@@ -48,6 +51,7 @@ rules:
 
   proposal_complete:
     id: R7
+    switch: gate
     name: proposal-complete
     kind: conditional_require
     statement: "Bộ ba một feature phải đủ chất. SPEC (có '## Plan' + còn 'proposed') phải khai '## Agent Task Assignment' + link Sequence diagram + '## Global constraints'. PLAN (file '*-PLAN.md', thứ bơm thẳng vào agent context=0) phải khai Files chính xác + Interfaces + code từng bước; cả hai cấm placeholder. Chi tiết nhánh PLAN nằm ở validator production proposal_complete.py (declarative không diễn tả nổi check per-task)."
@@ -65,6 +69,7 @@ rules:
 
   plan_executable:
     id: R18
+    switch: gate
     name: plan-executable
     kind: conditional_require
     statement: "PLAN thi hành (`*-PLAN.md`, do /plan sinh) là thứ BƠM THẲNG vào agent context=0 — nó không thừa hưởng context nào và không hỏi lại được, gặp chỗ mơ hồ nó đoán rồi im lặng. Nên PLAN phải khai đường dẫn file chính xác + Interfaces (Consumes/Produces) + ràng buộc bao trùm."
@@ -81,6 +86,7 @@ rules:
 
   okf_frontmatter:
     id: R9
+    switch: gate
     name: okf-frontmatter
     kind: require_frontmatter
     statement: "Wiki content (concepts/entities/sources/draft/architecture/tours — KỂ CẢ nháp) phải có YAML frontmatter + 'type' không rỗng (OKF v0.1). Scope khớp global production: siết frontmatter ngay từ nháp."
@@ -92,6 +98,7 @@ rules:
 
   seq_html_glass:
     id: R11
+    switch: gate
     name: seq-html-glass-style
     kind: conditional_require
     statement: "Seq diagram HTML (*-seq.html) PHẢI theo style docs-site-macos liquid-glass — KHÔNG theme flat/tối tự chế (bài học 250626 'sao xấu thế'). Bắt buộc: backdrop-filter glass + nền sáng linear-gradient(180deg,#f7fbff…) + edge-highlight inset."
@@ -107,6 +114,7 @@ rules:
 
   evidence_terminal:
     id: R19
+    switch: gate
     name: evidence-terminal
     kind: content_check
     statement: "Tai lieu mang ket luan co khoi ```evidence-chain PHAI de MOI duong di tu goc toi la ket thuc o nut CHUNG CU (observed/code-line/tool-record/graph-edge/web/parametric/absence), khong duoc ket thuc o nut suy luan. web doi url tuyet doi tro DUNG CHO da doc + ngay truy cap + trich nguyen van; parametric (kien thuc tu TRAINING cua model) doi origin + co unverified va KHONG duoc lam diem cuoi duy nhat. Chuoi vong tron = khong hop le. KET LUAN VE CODE dung code-line: neo vao SO DONG (path/file.ext:LINE), va dong do KHONG duoc chi la mot LOI GOI HAM — mot loi goi khong chung minh ham do lam gi. Ham co trong source thi phai tro tiep impl_ref toi dong dinh nghia; ham nam trong SDK/thu vien thi phai tra tai lieu SDK (sdk_doc: url + accessed + quote) VA tai lieu phai mang CANH BAO DO cho nguoi doc. Khong duoc muon observed cho file ma nguon de ne luat nay."
@@ -119,6 +127,7 @@ rules:
 
   pull_before_change:
     id: R12
+    switch: gate
     name: pull-before-change
     kind: process_gate                     # git-state gate — KHÔNG phải content-check → llmwiki-validate bỏ qua. CHỈ 2 điểm enforce phủ được mọi vendor.
     statement: "(B) TRƯỚC khi bắt đầu việc / fan-out đa-agent: orchestrator chạy pull-gate sweep 1 lần (base tươi cho cả đàn agent). (C) TRƯỚC khi push: pre-push hook git-level chặn nếu local SAU remote. KHÔNG có hook chặn từng-edit (per-edit PreToolUse) — cố tình bỏ: cost cao, lệch vendor, đã được (B) phủ."
@@ -131,6 +140,7 @@ rules:
   # đủ rule-set (drift-test gác hai policy khớp). Enforce = chính pre-commit framework.
   verify_before_commit:
     id: R6
+    switch: gate
     name: verify-before-commit
     kind: repo_gate                        # documentary: validator bỏ qua; gate thật = pre-commit + CI + skill
     statement: "Mọi commit phải qua gate: validators + lint + drift-test + R11 seq-glass. Fail = không commit được."
@@ -145,6 +155,7 @@ rules:
   # (hết rò "nguồn chân lý"). Làm policy DRIVE wiring là bước sau. Xem [[rule-registry]].
   index_sync:
     id: R3
+    switch: gate
     name: index-sync
     kind: hook_event
     statement: "wiki/index.md phải liệt kê đúng tập file wiki tồn tại; phiên có sửa wiki mà index lệch → chặn kết thúc lượt."
@@ -157,6 +168,7 @@ rules:
 
   audit_log:
     id: R4
+    switch: gate
     name: audit-log
     kind: hook_event
     statement: "Mọi tool-call ghi .claude/audit/audit.jsonl (timestamp) + sinh log.md người-đọc-được. Không chặn."
@@ -170,6 +182,7 @@ rules:
 
   session_health:
     id: R8
+    switch: gate
     name: session-health
     kind: hook_event
     statement: "Đầu phiên: báo số rule đang gác + CHECK DRIFT policy/version vs remote (cảnh báo nếu lệch → /sync-template). Không chặn."
@@ -182,6 +195,7 @@ rules:
 
   docs_gate:
     id: R10
+    switch: gate
     name: docs-gate
     kind: hook_event
     statement: "Mỗi N prompt (default 5) chưa dùng /docs-site-macos hay /orca-workflow → inject directive đề nghị bổ sung docs. Báo cáo, không chặn."
@@ -194,6 +208,7 @@ rules:
 
   decision_adr:
     id: R13
+    switch: gate
     name: decision-to-adr
     kind: content_check
     statement: "Quyết định 'architecture' trong decisions.md phải ref một ADR; ADR cho EDIT tự do; XÓA ADR chỉ khi đã bị đè (Superseded by / supersedes ADR-N)."
@@ -204,6 +219,7 @@ rules:
 
   no_ai_attribution:
     id: R15
+    switch: gate
     name: no-ai-attribution
     kind: process_gate                     # git commit-msg gate — KHÔNG content-check → llmwiki-validate bỏ qua. Enforce ở tầng git (mọi vendor).
     statement: "Commit message KHÔNG được ghi công cho AI (Co-Authored-By: Claude…, Generated with Claude Code, 🤖). Author/committer chỉ là danh tính người. Fail-open nếu thiếu file message."
@@ -214,6 +230,7 @@ rules:
 
   patterns_guard:
     id: R14
+    switch: guardrail
     name: patterns-protected
     kind: deny_write
     statement: "Kho pattern llmwiki/patterns/ chỉ sửa khi user cho phép (env LLMWIKI_PATTERNS_UNLOCK=1) — agent không tự ý sửa kho tham chiếu (raw/ nhưng thấp hơn một bậc)."
@@ -228,6 +245,7 @@ rules:
 
   report_show_path:
     id: R16
+    switch: gate
     name: report-show-path
     kind: content_check
     statement: "HTML report/visualization dưới llmwiki/html/ (trừ archive/, assets/) phải chứa đường dẫn tuyệt đối của chính nó (footer/titlebar) — người xem biết file nằm đâu để mở lại/sửa."
@@ -239,6 +257,7 @@ rules:
 
   problem_tree_flush:
     id: R17
+    switch: gate
     name: problem-tree-flush
     kind: hook_event
     statement: "SessionEnd: phiên có diff/untracked chạm bề mặt framework (skills/ harness/ llmwiki/ fdk/) mà problem-tree chưa được cập nhật → hook tự append node stub pending vào llmwiki/html/fdk-problem-tree.html bằng code thuần (0 token). Lần /fdk kế tiếp distill. Báo cáo, không chặn — SessionEnd không block được."
@@ -251,6 +270,7 @@ rules:
 
   touched_paths:
     id: R21
+    switch: gate
     name: touched-paths
     kind: hook_event
     statement: "Stop: cuối MỖI lượt, hook in cho user (systemMessage, 0 token của model) hai khối. (1) Trang NGƯỜI ĐỌC phiên này tạo/sửa trong wiki (.md/.html dưới llmwiki/, .llmwiki/, fdk/wiki/ — trừ index/log/provenance/raw/skills và trang tự sinh lại như atlas, control-room, overstack.html): mỗi dòng ghi TIÊU ĐỀ THẬT của trang (frontmatter title hoặc <title>) kèm link file:// tuyệt đối, thứ tự HTML → graph → PLAN → còn lại, trần 10 (dư ghi +N). (2) Mọi file khác KHÔNG rải path: một dòng mỗi nhóm (test · skill · dữ liệu graph/sổ máy · trang tự sinh lại · CI/cấu hình · raw · code · tài liệu ngoài wiki · khác) gồm nhãn + số lượng + tối đa 3 tên. (3) Server ĐANG CHẠY để bấm mở: process đang LISTEN có cwd nằm trong dự án → http://localhost:PORT/ kèm lệnh + thư mục chạy; nếu một cloudflared đang chạy trỏ ingress về port đó thì in hostname thật bên cạnh (⇄ https://…); hostname tunnel đang sống trỏ dịch vụ ngoài cũng được liệt kê. Chỉ đọc lsof/ps/config tunnel, không mở kết nối. Tắt riêng OVERSTACK_TOUCHED_SERVERS=0. Nguồn: Write/Edit trong transcript + git status mtime >= mốc đầu phiên + file thuộc commit tạo trong phiên. Tắt OVERSTACK_TOUCHED_PATHS=0; trần OVERSTACK_TOUCHED_CAP."
@@ -262,6 +282,7 @@ rules:
 
   html_slop:
     id: R22
+    switch: gate
     name: html-slop
     kind: content_check
     statement: 'Trang HTML nằm trực tiếp trong một thư mục html/ không được mang ba dấu hiệu AI-slop mà cổng tĩnh đã có luật: (a) sọc viền MÀU một cạnh (border-left|right >= 3px solid màu bão hoà) trên thẻ/nút/callout; (b) gradient-text (background-clip:text + chữ trong suốt); (c) thiếu chế độ tối (không [data-theme=dark], không prefers-color-scheme). Artifact archify được miễn (viewer tự chứa, như R16/R20).'
@@ -272,6 +293,7 @@ rules:
 
   html_docs_shell:
     id: R20
+    switch: gate
     name: html-docs-shell
     kind: content_check
     statement: 'Trang HTML nằm trực tiếp trong một thư mục html/ phải có vỏ tài liệu nhất quán, bất kể skill nào sinh: (a) hơn 3 mục (<section id> hoặc <h2>) thì phải có <nav> chứa ít nhất 3 link #anchor; (b) sơ đồ archify nhúng qua <iframe> phải dùng preset macos như trang chứa. Thoát tường minh: <meta name="overstack-nav" content="none"> / <meta name="overstack-preset" content="<preset>">.'

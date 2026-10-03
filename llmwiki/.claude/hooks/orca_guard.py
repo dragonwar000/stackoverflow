@@ -12,7 +12,7 @@ Chỉ soi tool Bash. Không bao giờ làm gãy phiên: lỗi gì cũng exit 0.
 import re
 import sys
 
-from hooklib import audit, read_payload
+from hooklib import audit, feature_enabled, project_dir, read_payload
 
 # Union các version CLI: bản cũ (ready|in_progress|completed|failed) + bản mới
 # (pending|ready|dispatched|completed|failed|blocked). Tránh false-block khi CLI
@@ -34,6 +34,8 @@ def emit_context(msg: str) -> None:
 def main() -> None:
     payload = read_payload()
     audit(payload, "PreToolUse")
+    if not feature_enabled(project_dir(payload), "orca-guard"):
+        sys.exit(0)
 
     if payload.get("tool_name") != "Bash":
         sys.exit(0)

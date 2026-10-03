@@ -18,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hooklib import (audit, find_wiki_dir, orca_graph_running, overstack_dir, project_dir, read_payload,
+from hooklib import (audit, feature_enabled, find_wiki_dir, orca_graph_running, overstack_dir, project_dir, read_payload,
                      resolve_tool)
 
 EVERY = int(os.environ.get("LLMWIKI_DOCS_GATE_EVERY", "5") or "5")
@@ -76,10 +76,10 @@ def emit(msg: str) -> None:
 GOAL_RE = re.compile(r"(?<![\w-])goal(?![\w-])", re.I)
 
 
-def goal_directive(prompt, atlas=""):
+def goal_directive(prompt, atlas="", root=""):
     """Prompt có từ khoá `goal` (nguyên từ, ngoài khối code) → chỉ thị kèm /orca-graph để goal
     visualize được. Hook chỉ INJECT, không tự chạy build. Tắt: OVERSTACK_GOAL_HOOK=0."""
-    if os.environ.get("OVERSTACK_GOAL_HOOK") == "0":
+    if not feature_enabled(root or os.getcwd(), "goal-hook"):
         return None
     if not GOAL_RE.search(re.sub(r"```.*?```", "", prompt or "", flags=re.S)):
         return None
@@ -139,7 +139,7 @@ def main() -> None:
 
     try:
         atlas = Path(overstack_dir(str(root)) or root) / "graph" / "atlas.html"   # layout dot/không-dot đều đúng
-        g = goal_directive(payload.get("prompt", ""), str(atlas) if atlas.is_file() else "")
+        g = goal_directive(payload.get("prompt", ""), str(atlas) if atlas.is_file() else "", root=str(root))
         if g:
             emit(g)
     except Exception:

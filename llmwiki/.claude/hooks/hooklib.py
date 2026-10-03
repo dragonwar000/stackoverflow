@@ -280,6 +280,18 @@ def feature_on(root: str, fid: str, default=None, argv=None, env=None):
         return (True if default is None else default), "lỗi đọc công tắc"
 
 
+def feature_enabled(root: str, fid: str, default=None, argv=None, env=None) -> bool:
+    """feature_on + MỘT dòng stderr khi TẮT tường minh (tầng khác 'mặc định'). Tắt do mặc định thì im
+    để không nhiễu mỗi phiên. Fail-open: lỗi in không chặn hook."""
+    on, layer = feature_on(root, fid, default=default, argv=argv, env=env)
+    if not on and layer != "mặc định":
+        try:
+            print(f"[harness] {fid} TẮT — nguồn: {layer}", file=sys.stderr)
+        except Exception:
+            pass
+    return bool(on)
+
+
 def stamp_path(root: str):
     d = overstack_dir(root)
     if d and (d / ".harness-stamp").is_file():

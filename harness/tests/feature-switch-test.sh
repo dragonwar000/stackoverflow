@@ -9,6 +9,15 @@ cp harness/features.yaml "$TMP/harness/"
 printf 'enabled: true\n' > "$TMP/harness/agent-trace.config.yaml"
 HOOKLIB="$ROOT/llmwiki/.claude/hooks/hooklib.py"
 
+# Chuyển cờ: hook không còn đọc env cũ trực tiếp — mọi công tắc đi qua feature_on/feature_enabled.
+for pair in "llmwiki/.claude/hooks/stop.py:OVERSTACK_WIKIGRAPH" \
+            "llmwiki/.claude/hooks/session_start.py:OVERSTACK_WIKIGRAPH" \
+            "llmwiki/.claude/hooks/user_prompt_submit.py:OVERSTACK_GOAL_HOOK"; do
+  f=${pair%%:*}; k=${pair##*:}
+  if grep -q "os.environ.get(\"$k\")" "$f"; then echo "  FAIL còn đọc env trực tiếp: $f $k"; exit 1; fi
+done
+echo "  ok   không còn đọc env cũ trực tiếp ở stop/session_start/user_prompt_submit"
+
 python3 - "$HOOKLIB" "$TMP" <<'PY'
 import importlib.util, os, sys
 hl_path, tmp = sys.argv[1], sys.argv[2]
@@ -76,8 +85,22 @@ open(os.path.join(glob, "harness", "features.yaml"), "w").write(open(os.path.joi
 hl.HARNESS_HOME = __import__("pathlib").Path(glob)
 check("19 registry lấy từ global khi dự án không có", sorted(hl.feature_registry(empty)) == sorted(reg), True)
 hl.HARNESS_HOME = __import__("pathlib").Path(tmp) / "no-global"
+# feature_enabled: in đúng một dòng stderr khi tắt tường minh; im lặng khi tắt do mặc định hoặc khi bật
+import contextlib, io
+def capture(fn):
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        r = fn()
+    return r, buf.getvalue()
+# 20 tắt tường minh (env cũ =0) → một dòng stderr nêu công tắc và tầng
+check("20 tắt tường minh in một dòng stderr", capture(lambda: hl.feature_enabled(tmp, "goal-hook", env={"OVERSTACK_GOAL_HOOK": "0"})),
+      (False, "[harness] goal-hook TẮT — nguồn: env OVERSTACK_GOAL_HOOK\n"))
+# 21 tắt do mặc định (caller default=False) → im lặng
+check("21 tắt do mặc định im lặng", capture(lambda: hl.feature_enabled(tmp, "wikigraph", default=False, env={})), (False, ""))
+# 22 bật → im lặng
+check("22 bật thì im lặng", capture(lambda: hl.feature_enabled(tmp, "goal-hook", env={})), (True, ""))
 
-print(f"feature-switch-test: {passed} pass, {failed} fail")
+print(f"feature-switch-test:{passed} pass, {failed} fail")
 sys.exit(1 if failed else 0)
 PY
 rc=$?

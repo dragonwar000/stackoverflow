@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hooklib import HARNESS_HOME, audit, find_wiki_dir, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, stamp_path
+from hooklib import HARNESS_HOME, audit, feature_enabled, find_wiki_dir, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, stamp_path
 from hooklib import orca_graph_running as hooklib_orca_graph_running
 
 
@@ -315,7 +315,7 @@ def wikigraph_reminder(root: Path) -> None:
     generator (tốn ~5s/phiên) — chỉ LỘ DIỆN. Chỉ khi opt-in (tôn trọng Taleb: không nag project
     chưa bật cờ). Fail-open tuyệt đối; TRƯỚC early-exit manifest nên downstream v4 cũng nhận."""
     try:
-        if os.environ.get("OVERSTACK_WIKIGRAPH") != "1":
+        if not feature_enabled(str(root), "wikigraph", default=False):
             return
         od = overstack_dir(str(root))
         if od is None:

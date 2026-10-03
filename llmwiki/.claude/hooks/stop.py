@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 
-from hooklib import running_servers, servers_message, audit, code_log, find_validators, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, run_validator, scope_config, stamp_path, session_touched_files, touched_message, session_new_html, new_html_message, session_graphs, graphs_message
+from hooklib import feature_enabled, running_servers,servers_message, audit, code_log, find_validators, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, run_validator, scope_config, stamp_path, session_touched_files, touched_message, session_new_html, new_html_message, session_graphs, graphs_message
 
 
 # file code (đa ngôn ngữ) trong git-status → trigger regen phần code-graph của wiki-graph.
@@ -114,7 +114,7 @@ def regen_docs(root: str) -> None:
     # không bao giờ regen (GH#70). Khoá enablement vào chính stamp (đã gate hook) làm vòng tự-nhất-quán:
     # tín hiệu bật hook = tín hiệu bật wiki-graph. Giữ env cũ làm override tương thích ngược.
     has_stamp = stamp_path(root) is not None
-    wikigraph_on = bool(wg) and (is_framework or has_stamp or os.environ.get("OVERSTACK_WIKIGRAPH") == "1")
+    wikigraph_on = bool(wg) and feature_enabled(root, "wikigraph", default=(is_framework or has_stamp))
     if not is_framework and not wikigraph_on:
         return  # không phải framework và cũng không bật wiki-graph downstream → bỏ hẳn (rẻ)
     try:
@@ -201,7 +201,7 @@ def secondary_memory(root: str, session: str) -> None:
         return  # thiếu engine (local+global) → bỏ (fail-open)
     is_framework = os.path.isfile(os.path.join(root, "fdk", "tools", "build-overstack-docs.py"))
     has_stamp = stamp_path(root) is not None
-    if not (is_framework or has_stamp or os.environ.get("OVERSTACK_WIKIGRAPH") == "1"):
+    if not feature_enabled(root, "wikigraph", default=(is_framework or has_stamp)):
         return  # downstream chưa bootstrap (không stamp) → bỏ
     try:
         dirty = _run(["git", "status", "--porcelain"], cwd=root,

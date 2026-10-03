@@ -77,7 +77,60 @@ META_DOC_RE = re.compile(r"^r19_meta:\s*true\s*(?:#.*)?$", re.MULTILINE | re.IGN
 _FALLBACK = {"enabled": True, "mode": "advisory"}
 
 
+def _harness_dir(root: Path) -> Path:
+    """Thu muc harness cua du an: .harness (downstream) hoac harness (repo framework)."""
+    for n in (".harness", "harness"):
+        if (Path(root) / n).is_dir():
+            return Path(root) / n
+    return Path(root) / "harness"
+
+
+def _local_override(root: Path, fid: str):
+    """features.local.yaml (cong tac cuc bo, khong commit) — cung khuon hooklib.feature_on. Tra bool hoac None."""
+    for n in (".llmwiki", "llmwiki"):
+        f = Path(root) / n / "features.local.yaml"
+        if f.is_file():
+            try:
+                import yaml
+                d = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+                v = d.get(fid) if isinstance(d, dict) else None
+            except Exception:
+                return None
+            if isinstance(v, bool):
+                return v
+            s = str(v).strip().lower()
+            if s in ("on", "1", "true", "yes"):
+                return True
+            if s in ("off", "0", "false", "no"):
+                return False
+            return None
+    return None
+
+
 def load_cfg(root: Path) -> dict:
+    """Config R19 (_load_cfg_base) roi ap cong tac cuc bo: features.local.yaml thang config, thua flag/env."""
+    cfg = _load_cfg_base(root)
+    loc = _local_override(root, "evidence-terminal")
+    if loc is not None:
+        cfg = {**cfg, "enabled": loc, "_layer": "features.local.yaml (feature-switch)"}
+    return cfg
+
+
+def _audit_off(root: Path, layer: str) -> None:
+    """Moi lan TAT gate R19 ghi mot dong nhat ky vao thu muc metrics cua harness (feature-switch.jsonl). Fail-open."""
+    try:
+        import json, datetime
+        d = _harness_dir(root) / "metrics"
+        d.mkdir(parents=True, exist_ok=True)
+        rec = {"ts": datetime.datetime.now().isoformat(timespec="seconds"), "feature": "evidence-terminal",
+               "class": "gate", "layer": layer, "by": "validator"}
+        with open(d / "feature-switch.jsonl", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _load_cfg_base(root: Path) -> dict:
     """Doc config qua bnal_config khi co; khong co thi doc thang file, cuoi cung moi fallback.
 
     KHONG duoc im lang roi ve fallback advisory khi config THAT dang la strict — nhu the luat
@@ -108,7 +161,7 @@ def switch_state(argv, env, cfg):
     if raw is not None and str(raw).strip().lower() in ("0", "false", "off"):
         return False, "bien moi truong OVERSTACK_EVIDENCE_TERMINAL"
     if not cfg.get("enabled", True):
-        return False, "harness/evidence-terminal.config.yaml (enabled: false)"
+        return False, cfg.get("_layer") or "harness/evidence-terminal.config.yaml (enabled: false)"
     return True, ""
 
 
@@ -373,6 +426,7 @@ def main() -> None:
     if not enabled:
         print(f"[R19 evidence-terminal] DANG TAT boi {layer} — khong kiem chuoi chung cu",
               file=sys.stderr)
+        _audit_off(root, layer)
         sys.exit(0)
 
     if "--self-test" in argv:

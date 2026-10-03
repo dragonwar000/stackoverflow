@@ -10,7 +10,7 @@ import json
 import os
 import subprocess
 
-from hooklib import find_validators, project_dir, read_payload, resolve_tool, run_validator
+from hooklib import feature_enabled, find_validators, project_dir, read_payload, resolve_tool, run_validator
 
 WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
@@ -37,6 +37,8 @@ def run_egress_guard(root: str, event: dict, tool: str, target: str) -> None:
     xem harness/egress-guard.config.yaml). Trước bản vá này script chỉ chạy --self-test trong
     medic/fdk-gate — KHÔNG chặn Bash thật lúc runtime. Mặc định mode:warn nên vẫn fail-open cho
     tới khi allow_domains được calib + lật mode:block. Fail-open nếu không tìm thấy script."""
+    if not feature_enabled(root, "egress-guard"):
+        return
     guard = resolve_tool(root, "harness/scripts/egress-guard.py")
     if not guard:
         return
