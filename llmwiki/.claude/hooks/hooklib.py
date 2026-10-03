@@ -43,6 +43,22 @@ def resolve_tool(root: str, rel: str):
     return None
 
 
+def memory_backend(root: str) -> str:
+    """Backend memory của project: zeromem | mem-rank | both. Fail-open về mem-rank khi không đọc được."""
+    zb = resolve_tool(root, "harness/scripts/zeromem-bridge.py")  # bare-path: ok — rel khung framework, resolve_tool map sang global ~/.claude/harness/harness/scripts
+    if not zb:
+        return "mem-rank"
+    try:
+        out = subprocess.run([sys.executable, zb, "backend", "--root", root], cwd=root,
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+    except Exception:
+        return "mem-rank"
+    if out.startswith("invalid:"):
+        sys.stderr.write(f"memory.backend không hợp lệ ({out[8:]}) — giữ mem-rank\n")
+        return "mem-rank"
+    return out if out in ("zeromem", "mem-rank", "both") else "mem-rank"
+
+
 def find_validators(start: str):
     """Thứ tự: env LLMWIKI_VALIDATORS → bản copy cạnh hooks → harness/validators ở repo cha
     → GLOBAL ~/.claude/harness/harness/validators (global-shared)."""

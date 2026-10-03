@@ -21,7 +21,10 @@ class BridgeError(RuntimeError):
 
 
 def zm_bin():
-    return os.environ.get("ZEROMEM_ZM") or shutil.which("zm")
+    env = os.environ.get("ZEROMEM_ZM")
+    if env:
+        return env if os.path.isfile(env) else None
+    return shutil.which("zm")
 
 
 def project_key(root: str) -> str:

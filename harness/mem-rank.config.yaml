@@ -30,3 +30,8 @@ eviction:
 #   2. Calibrate relevance.min_score + eviction on real memory volume.
 #   3. Run: python3 harness/scripts/mem-rank.py --self-test  (must PASS).
 #   4. Flip verified:true. Only then trust ranked retrieval for production recall.
+
+# Backend memory của project: zeromem (mặc định) | mem-rank | both.
+# Đọc bởi harness/scripts/zeromem-bridge.py (memory_backend). Thiếu khoá → zeromem.
+memory:
+  backend: zeromem

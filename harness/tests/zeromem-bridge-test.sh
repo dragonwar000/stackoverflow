@@ -29,5 +29,27 @@ python3 "$BRIDGE" forget-session --root "$TMP" --session aaaaaaaa >/dev/null 2>&
 python3 "$BRIDGE" ingest --root "$TMP" --session aaaaaaaa --transcript "" >/dev/null 2>&1
 [ $? -eq 0 ] && ok "ingest không có transcript → rc 0 không làm gì" || bad "ingest rỗng" "rc khác 0"
 
+mkcfg(){ mkdir -p "$TMP/cfg/harness"; printf '%s' "$1" > "$TMP/cfg/harness/mem-rank.config.yaml"; }
+mkcfg 'verified: false
+'
+[ "$(python3 "$BRIDGE" backend --root "$TMP/cfg")" = "zeromem" ] && ok "thiếu khoá memory → zeromem" || bad "mặc định" "$(python3 "$BRIDGE" backend --root "$TMP/cfg")"
+mkcfg 'verified: false
+memory:
+  backend: mem-rank
+'
+[ "$(python3 "$BRIDGE" backend --root "$TMP/cfg")" = "mem-rank" ] && ok "backend mem-rank được đọc" || bad "mem-rank" "$(python3 "$BRIDGE" backend --root "$TMP/cfg")"
+mkcfg 'memory:
+  backend: both
+'
+[ "$(python3 "$BRIDGE" backend --root "$TMP/cfg")" = "both" ] && ok "backend both được đọc" || bad "both" "$(python3 "$BRIDGE" backend --root "$TMP/cfg")"
+mkcfg 'memory:
+  backend: foo
+'
+[ "$(python3 "$BRIDGE" backend --root "$TMP/cfg")" = "invalid:foo" ] && ok "giá trị lạ → invalid:foo, không đoán" || bad "invalid" "$(python3 "$BRIDGE" backend --root "$TMP/cfg")"
+mkcfg 'memory:
+  backend: zeromem
+'
+[ "$(ZEROMEM_ZM=/does/not/exist PATH=/usr/bin:/bin python3 "$BRIDGE" backend --root "$TMP/cfg" 2>/dev/null)" = "mem-rank" ] && ok "zeromem không có zm → rơi về mem-rank" || bad "fallback zm" "không khớp"
+
 echo "zeromem-bridge-test: $pass pass, $fail fail"
 [ $fail -eq 0 ] && echo "PASS" || exit 1
