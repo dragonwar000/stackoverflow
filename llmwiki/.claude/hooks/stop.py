@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 
-from hooklib import feature_enabled, running_servers,servers_message, audit, code_log, find_validators, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, run_validator, scope_config, stamp_path, session_touched_files, touched_message, session_new_html, new_html_message, session_graphs, graphs_message
+from hooklib import feature_enabled, feature_on, running_servers, servers_message, audit, code_log, find_validators, harness_dir, memory_backend, overstack_dir, project_dir, read_payload, resolve_tool, run_validator, scope_config, stamp_path, session_touched_files, touched_message, session_new_html, new_html_message, session_graphs, graphs_message
 
 
 # file code (đa ngôn ngữ) trong git-status → trigger regen phần code-graph của wiki-graph.
@@ -201,7 +201,9 @@ def secondary_memory(root: str, session: str) -> None:
         return  # thiếu engine (local+global) → bỏ (fail-open)
     is_framework = os.path.isfile(os.path.join(root, "fdk", "tools", "build-overstack-docs.py"))
     has_stamp = stamp_path(root) is not None
-    if not feature_enabled(root, "wikigraph", default=(is_framework or has_stamp)):
+    # Bộ nhớ thứ cấp KHÔNG phải wiki-graph: stamp là đủ để bật, công tắc wikigraph chỉ còn vai trò opt-in
+    # cho dự án chưa stamp (như env OVERSTACK_WIKIGRAPH=1 trước đây). Tắt wikigraph không được tắt bộ nhớ.
+    if not (is_framework or has_stamp or feature_on(root, "wikigraph", default=False)[0]):
         return  # downstream chưa bootstrap (không stamp) → bỏ
     try:
         dirty = _run(["git", "status", "--porcelain"], cwd=root,
