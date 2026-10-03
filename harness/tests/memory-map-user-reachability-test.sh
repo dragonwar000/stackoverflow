@@ -40,8 +40,8 @@ grep -q 'resolve_tool(root, "harness/scripts/scratch-log.py")' "$SP" 2>/dev/null
 grep -q 'resolve_tool(root, "fdk/tools/memory-map.py")' "$SP" 2>/dev/null \
   && ok "secondary_memory resolve memory-map qua resolve_tool (repo-local → GLOBAL)" \
   || bad "memory-map còn kiểm repo-local" "downstream không vẽ được view"
-grep -q 'has_stamp or os.environ.get("OVERSTACK_WIKIGRAPH")' "$SP" 2>/dev/null \
-  && ok "secondary_memory gate is_framework|has_stamp|env (đối xứng wiki-graph)" \
+grep -q 'has_stamp or feature_on(root, "wikigraph", default=False)' "$SP" 2>/dev/null \
+  && ok "secondary_memory gate is_framework|has_stamp|công tắc wikigraph (opt-in, env cũ vẫn nhận)" \
   || bad "secondary_memory thiếu gate stamp" "không bật downstream / bật lung tung repo bất kỳ"
 
 hdr "B — FUNCTIONAL: dự án USER SẠCH + global giả → secondary_memory resolve từ GLOBAL"
