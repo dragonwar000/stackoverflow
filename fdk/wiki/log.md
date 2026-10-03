@@ -320,3 +320,36 @@ Viết lại /fdk (canonical + mirror, diff=SAME) thành self-contained: pre-fli
 - 2026-07-23 14:56 — session `6ac5fed4` — 86 tool calls — files: CLAUDE.md, code-logger.py, fdk-gate.py, harness-lint.py, index.md, medic.py, outlines-distill.md, wiki-health.py
 - 2026-07-27 10:33 — session `dff80143` — 6 tool calls — files: 270726-innovation.md, ISSUES.md
 - 2026-08-14 08:13 — session `dba79064` — 12 tool calls — files: .stop-debounce.json, harness.yml, index.md, log.md
+- 2026-09-12 23:40 — phiên /fdk — thêm concepts/orca-graph.md + ADR-018 (orca-graph v2 theo Reprise Graph Engine PRD)
+- 2026-09-15 14:20 — session `3f868788` — 42 tool calls — files: 00-New-Project.md, 150926-payroll-sit-ui-PLAN.md, DOCS.md, README.md, SKILL.md, design-foundation.md, harness.yml, index.md …
+- 2026-09-15 14:20 — session `3f868788` — 42 tool calls — files: 00-New-Project.md, 150926-payroll-sit-ui-PLAN.md, DOCS.md, README.md, SKILL.md, design-foundation.md, harness.yml, index.md …
+- 2026-09-15 14:27 — session `3f868788` — 42 tool calls — files: 00-New-Project.md, 150926-payroll-sit-ui-PLAN.md, DOCS.md, README.md, SKILL.md, design-foundation.md, harness.yml, index.md …
+- 2026-09-15 14:27 — session `3f868788` — 42 tool calls — files: 00-New-Project.md, 150926-payroll-sit-ui-PLAN.md, DOCS.md, README.md, SKILL.md, design-foundation.md, harness.yml, index.md …
+- 2026-09-15 14:30 — session `3f868788` — 42 tool calls — files: 00-New-Project.md, 150926-payroll-sit-ui-PLAN.md, DOCS.md, README.md, SKILL.md, design-foundation.md, harness.yml, index.md …
+- 2026-09-15 14:30 — session `3f868788` — 42 tool calls — files: 00-New-Project.md, 150926-payroll-sit-ui-PLAN.md, DOCS.md, README.md, SKILL.md, design-foundation.md, harness.yml, index.md …
+- 2026-09-19 11:52 — session `0d1b17dc` — 2 tool calls — files: self-host-vercel-cloudflare-recipe.md
+- 2026-09-19 11:52 — session `0d1b17dc` — 2 tool calls — files: self-host-vercel-cloudflare-recipe.md
+
+## 2026-09-20 — update — orca-graph v3 + tách repo engine
+
+- sửa `concepts/orca-graph.md` — mục "Bản v3": lý do cạnh + audit-edges, resource claims, lý do chờ, add-node, eval VT; engine tách sang `Rheinmir/orca-graph`, framework giữ shim + mirror skill (KÉO NGOÀI)
+- sửa `index.md` — dòng orca-graph ghi thêm v3
+
+## 2026-09-20 — update — repo_role · luồng cài đặt · font mặc định
+
+- tạo `concepts/install-update-flows.md` — bảng luồng A/B/C/D, mỗi ô một ca test hoặc ghi rõ chưa làm; hai gốc đã sửa
+- sửa `index.md` — thêm dòng install-update-flows
+
+## 2026-09-21 — update — framework tự bắt slop của chính nó
+
+- tạo `sources/200926-archify-renderer-fixes.md` — vá renderer ở fork archify (icon đè chữ, chữ mờ, khối dính); kèm nợ bảng delta
+- sửa `index.md` — thêm dòng 200926-archify-renderer-fixes
+- cổng tĩnh `frontend-antipattern --all` đổi từ danh sách tên ghi cứng sang QUÉT THƯ MỤC (26 → 38 file); dọn 23 FAIL về 0
+- cổng chạy-thật miễn `:disabled` và `[data-ovs-deemphasized]` (làm mờ có chủ ý phải tự khai, không đoán theo opacity)
+- luật R22 `html-slop` gác lúc GHI (PostToolUse nhánh .html) + fire-drill BAD/GOOD trong harness-doctor
+- `medic` probe frontend chạy `--all`; step CI sinh trang rồi chạy cả hai cổng trên 21 trang framework sinh
+- engine orca-graph 3.1.2 → 3.1.4: daemon vẽ đè cockpit bằng builder global cũ; chip `<code>` xếp dọc dính nhau
+- 2026-09-24 12:56 — session `e2543df0` — 52 tool calls — files: 240926-intent-manifest-ui-nightshift-PLAN.md, 240926-intent-manifest-ui-nightshift.md, app.html, audit-guide.mjs, brain.py, build-intake-guide-html.py, cli_json.py, compile.py …
+- 2026-09-24 12:56 — session `e2543df0` — 52 tool calls — files: 240926-intent-manifest-ui-nightshift-PLAN.md, 240926-intent-manifest-ui-nightshift.md, app.html, audit-guide.mjs, brain.py, build-intake-guide-html.py, cli_json.py, compile.py …
+- 2026-09-24 12:56 — session `d8d98d47` — 6 tool calls — files: html-visual-gate-test.sh, html-visual-gate.mjs
+- 2026-09-24 12:56 — session `d8d98d47` — 6 tool calls — files: html-visual-gate-test.sh, html-visual-gate.mjs

@@ -76,6 +76,8 @@ jobs:
           python3 harness/validators/index_sync.py --wiki-dir llmwiki/wiki
       - name: L4 wiki-health — broken wikilink (git-aware)
         run: python3 harness/scripts/wiki-health.py --wiki-dir fdk/wiki --fail-on broken
+      - name: L4 wiki-health — ledger issue không trỏ draft đã dời/mất
+        run: python3 harness/scripts/wiki-health.py --wiki-dir llmwiki/wiki --fail-on ledger > /dev/null
       - name: arch-scan — doc vs rule
         run: python3 harness/scripts/arch-scan.py --root .
       - name: retrieval-eval — query truy-hồi không tụt dưới sàn (tất định, không LLM)
@@ -85,12 +87,56 @@ jobs:
           # 2. chiến lược query (proxy L1 tất định) không hồi quy hit@k / phình token so baseline L0 đã commit
           python3 harness/scripts/query-proxy.py --mode L1 --topn 5 --out "$RUNNER_TEMP/retrieval-L1.json"
           python3 harness/scripts/retrieval-eval.py --outputs "$RUNNER_TEMP/retrieval-L1.json" --check
+      # R22 html-slop. Cổng TĨNH soi cả thư mục (mọi trang .html trong llmwiki/html và llmwiki/graph,
+      # trừ artifact archify). Cổng CHẠY-THẬT chỉ soi trang do CHÍNH lần chạy này SINH RA — trang viết tay
+      # cũ còn nợ tương phản (xem 200926-self-slop-gate-review.md), gác chúng ở đây là khoá CI vì nợ lịch sử.
+      # rc 4 (thiếu Playwright) là SKIP CÓ TÊN, không được đếm là PASS.
+      - name: html-slop — sinh trang rồi chạy CẢ HAI cổng (tĩnh + chạy thật)
+        run: |
+          set -euo pipefail
+          # Danh sách TRANG SINH của framework (chỉ build-control-room in `→ path`, các builder khác im lặng
+          # nên không suy ra được từ stdout). wiki-graph.html để NGOÀI: trang 5.548 node mất hơn 30s để tải
+          # nên cổng chạy-thật timeout — nợ đã ghi ở 200926-self-slop-gate-review.md, không bịt bằng cách bỏ cổng.
+          for t in build-docs-index build-health-dashboard build-control-room build-overstack-docs build-wiki-graph; do
+            python3 "fdk/tools/$t.py" >/dev/null 2>&1 || true
+          done
+          # rc 1 = có FAIL → đỏ · rc 2 = chỉ WARN (nợ cũ: SVG thiếu role, prose lọt code) → qua, như medic map 2→warn.
+          # Trước đây `set -e` biến WARN thành đỏ: CI harness đỏ từ 8fb5ef2 mà không có FAIL nào.
+          rc=0; python3 fdk/tools/frontend-antipattern.py --all || rc=$?
+          [ "$rc" = 1 ] && { echo "::error::cổng tĩnh có FAIL"; exit 1; }
+          python3 harness/validators/html_slop.py --self-test
+          : > "$RUNNER_TEMP/gen.txt"
+          for f in llmwiki/html/index.html llmwiki/html/280626-health-dashboard.html \
+                   llmwiki/html/control-room.html llmwiki/html/control-room-detail.html \
+                   llmwiki/html/control-room-kanban.html llmwiki/html/overstack.html \
+                   llmwiki/graph/*.html; do
+            [ -f "$f" ] && printf '%s\n' "$f" >> "$RUNNER_TEMP/gen.txt"
+          done
+          echo "trang sinh được gác:"; cat "$RUNNER_TEMP/gen.txt"
+          if [ ! -s "$RUNNER_TEMP/gen.txt" ]; then echo "SKIP cổng chạy-thật: không có trang sinh"; exit 0; fi
+          if npm i -g playwright >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1; then
+            rc=0
+            NODE_PATH=$(npm root -g) xargs node fdk/tools/html-visual-gate.mjs < "$RUNNER_TEMP/gen.txt" || rc=$?
+            if [ "$rc" = 4 ]; then echo "SKIP cổng chạy-thật: không có Playwright"; else exit "$rc"; fi
+          else
+            echo "SKIP cổng chạy-thật: không cài được Chromium trên runner"
+          fi
+      # Mỗi luật của cổng chạy-thật có fixture XẤU phải bị bắt + trang TỐT phải qua (Chromium đã cài ở bước trên; thiếu → test tự SKIP có tên).
+      - name: html-visual-gate + button-harmony — luật cổng chạy-thật cắn fixture xấu, tha fixture tốt
+        run: |
+          export NODE_PATH=$(npm root -g)
+          bash harness/tests/html-visual-gate-test.sh
+          bash harness/tests/button-harmony-test.sh
+      - name: downstream slop-gate — trang sinh Ở MÁY KHÁCH qua cả hai cổng
+        run: bash harness/tests/downstream-slop-gate-test.sh
       - name: code-health — Trụ 4 cổng CI tất định không-LLM (mọi .py compile; ruff nếu có)
         run: |
           pip install ruff --quiet || echo "ruff không cài được — chạy floor compile"
           python3 harness/validators/code_health.py --root .
       - name: harness-lint — meta-drift (hằng số content-dir + wiring policy→settings)
         run: python3 harness/scripts/harness-lint.py --check
+      - name: bare-path-lint — file đi xuống global không ghi cứng llmwiki/ · harness/ (ratchet, nợ mới đỏ)
+        run: python3 harness/validators/bare_path_lint.py --root . --check
       - name: agent↔claude skill-table parity
         run: python3 harness/validators/agent_claude_parity.py
       - name: duplicate-basename — slug wiki không trùng giữa các thư mục
@@ -127,8 +173,18 @@ jobs:
         run: bash harness/tests/hook-guard-invariant-test.sh .
       - name: wiki-sync — neo code→wiki (no-op gate 0-token)
         run: bash harness/tests/wiki-sync-test.sh .
+      - name: tidy — ngưỡng nháp + git-aware archive (D1/D2, không giết draft sống)
+        run: bash harness/tests/tidy-test.sh .
+      - name: install-seed — khung llmwiki seed ở MỌI mode, không đè, idempotent (GH#149)
+        run: bash harness/tests/install-seed-test.sh .
       - name: docs-skill-okf — skill tạo wiki .md phải xuất chuẩn OKF v0.1 (R9)
         run: bash harness/tests/docs-skill-okf-test.sh .
+      - name: swh-lint — mọi skill native theo solid-what-how/1 (WHAT/HOW, contract, ví dụ)
+        run: python3 fdk/tools/swh-lint.py --ci
+      - name: swh-lint + goal-hook + touched-paths (R21) — test hành vi
+        run: |
+          pip install pytest --quiet
+          python3 -m pytest -q harness/tests/test_swh_lint.py harness/tests/test_goal_hook.py harness/tests/test_touched_paths.py harness/tests/test_skill_reuse.py
       - name: harness-update — T1-T4 cài/refresh trong repo tạm cô lập
         run: bash harness/tests/harness-update-test.sh .
       - name: openclaude-install — detect/merge/idempotency trong HOME cô lập
@@ -167,6 +223,14 @@ jobs:
         run: bash harness/tests/scope-config-test.sh .
       - name: stop-hook-all-wikis — Stop auto-index + R3 soi MỌI wiki (fdk/wiki + llmwiki/wiki), GH#76
         run: bash harness/tests/stop-hook-all-wikis-test.sh .
+      - name: stop-budget — stop.py thoát trong ngân sách hook 30s, cổng R3 vẫn chạy sau bước nặng
+        run: bash harness/tests/stop-budget-test.sh .
+      - name: run-validator-timeout — validator quá timeout thì fail-open, không Traceback
+        run: python3 -m pytest -v harness/tests/test_run_validator_timeout.py
+      - name: unknown-ledger-args — thiếu --file/--id thì báo usage, không Traceback
+        run: python3 -m pytest -v harness/tests/test_unknown_ledger_args.py
+      - name: egress-guard-falsepos — tha loopback/việc thường ngày, vẫn cắn exfil thật
+        run: python3 harness/tests/egress-guard-falsepos-test.py
       - name: evidence-terminal — R19 chuỗi kết luận phải chạm chứng cứ + kill-switch
         run: bash harness/tests/evidence-terminal-test.sh .
       - name: anti-idle — provider cắt lượt bằng refusal rỗng thì Stop hook chặn dừng
@@ -177,6 +241,26 @@ jobs:
         run: bash harness/tests/dot-layout-migrate-test.sh .
       - name: budget-statusline — plugin status bar còn sống (self-test + $ khớp token-budget)
         run: bash harness/tests/budget-statusline-test.sh .
+      - name: dot-layout-runtime — hook GLOBAL chạy trong dự án downstream layout DOT (a-d, GH#153 class)
+        run: bash harness/tests/dot-layout-runtime-test.sh .
+      - name: r3-worktree-hook-env — R3 đúng khi chạy trong hook git của linked worktree (GIT_DIR không GIT_WORK_TREE)
+        run: bash harness/tests/r3-worktree-hook-env-test.sh .
+      - name: install-graph-option — module orca-graph (repo riêng) mặc định TICK, Enter là kéo; --no-graph / bỏ tick thì không kéo
+        run: |
+          # test cần một bản engine local làm nguồn (kín mạng trong từng ca); runner sạch thì cài trước — không có là test SKIP vô nghĩa
+          [ -d "$HOME/.orca-graph/repo/.git" ] || curl -fsSL https://raw.githubusercontent.com/Rheinmir/orca-graph/main/install.sh | bash -s -- --no-skill
+          bash harness/tests/install-graph-option-test.sh
+          python3 -m pytest -q harness/tests/test_control_room.py
+      - name: html-font-lint — mọi HTML framework sinh ra = Be Vietnam Pro NHÚNG (generator · engine qua shim · parity bản sao ở engine · template skill)
+        run: |
+          python3 -m pytest -q harness/tests/test_html_font.py harness/tests/test_repo_role.py harness/tests/test_ui_kit_sync.py
+          bash harness/tests/html-font-lint-test.sh
+      - name: install-flows — mỗi ô của bảng luồng cài/cập nhật là một ca (A3 A7 B1 B3 C1); B1 tự SKIP trên checkout nông
+        run: bash harness/tests/install-flows-test.sh
+      - name: windows-portability — cài trọn dưới stdout cp1252 + HOME trống (GH#168/#169)
+        run: bash harness/tests/windows-portability-test.sh
+      - name: install-ps1 — Windows entry point (fail-open nếu runner không có pwsh)
+        run: bash harness/tests/install-ps1-test.sh
       - name: tests-wired — MỌI harness/tests/*-test.sh phải có step trong workflow này
         run: |
           for t in harness/tests/*-test.sh; do

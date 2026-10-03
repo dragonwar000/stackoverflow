@@ -78,7 +78,16 @@ def p_backstop():
     thì GÃY lúc commit — cổng sức khoẻ cuối tuyên bố một phòng tuyến đang sống từ một inode.
     Cùng lớp lỗi với code-graph (xem p_deps)."""
     import shutil as _sh
-    hook = (ROOT / ".git/hooks/pre-commit").exists()
+    import subprocess as _sp
+    # worktree có `.git` là FILE → ROOT/.git/hooks không tồn tại dù hook dùng chung đã cài.
+    # Hỏi git: --git-path hooks/pre-commit trả đúng hook chung (và tôn trọng core.hooksPath).
+    try:
+        _p = _sp.run(["git", "-C", str(ROOT), "rev-parse", "--git-path", "hooks/pre-commit"],
+                     capture_output=True, text=True, timeout=5).stdout.strip()
+        hook_path = Path(_p) if _p and Path(_p).is_absolute() else ROOT / (_p or ".git/hooks/pre-commit")
+    except Exception:
+        hook_path = ROOT / ".git/hooks/pre-commit"
+    hook = hook_path.exists()
     binary = _sh.which("pre-commit") is not None
     if hook and binary:
         return "ok", "pre-commit sống (shim + binary trên PATH)", ""
@@ -169,12 +178,14 @@ def p_frontend():
     chk = ROOT / "fdk/tools/frontend-antipattern.py"
     if not chk.exists():
         return "skip", "chưa có frontend-antipattern.py", ""
-    rc, out = sh([PY, str(chk)], timeout=30)
+    # --all: soi MỌI trang framework sinh. Trước 20/09/2026 probe này chạy không tham số nên chỉ soi
+    # đúng một trang → luôn xanh trong khi 26 trang khác đỏ (user báo: "cơ chế bắt slop chưa tự bắt nó").
+    rc, out = sh([PY, str(chk), "--all"], timeout=120)
     tail = next((ln.strip() for ln in reversed(out.splitlines()) if ln.strip()), "")
     if rc == 1:
-        return "fail", tail or "có anti-pattern frontend", "python3 fdk/tools/frontend-antipattern.py  # xem chi tiết"
+        return "fail", tail or "có anti-pattern frontend", "python3 fdk/tools/frontend-antipattern.py --all  # xem chi tiết"
     if rc == 2:
-        return "warn", tail or "có cảnh báo frontend", "python3 fdk/tools/frontend-antipattern.py"
+        return "warn", tail or "có cảnh báo frontend", "python3 fdk/tools/frontend-antipattern.py --all"
     return "ok", "HTML sinh sạch anti-pattern frontend", ""
 
 
@@ -193,7 +204,8 @@ PROBE_MECH_MAP = {
     "narrative": None, "foundation": None, "code": None, "eval": None, "freshinstall": None,
     "selfstate": "code-state", "capsurface": "capsurface",
     "capproof": "capproof", "provenance": "provenance-scope",
-    "orchestration": None, "deps": None, "wikisummary": None,
+    "orchestration": None, "deps": None, "wikisummary": None, "tidy": None,
+    "swh": "swh-lint",
 }
 
 
@@ -243,7 +255,7 @@ def p_narrative():
     canary = []
     skdir = ROOT / "skills"
     if skdir.is_dir():
-        for sk in sorted(skdir.glob("*/SKILL.md")):
+        for sk in sorted([*skdir.glob("*/SKILL.md"), *skdir.glob("external/*/SKILL.md")]):
             head = sk.read_text(encoding="utf-8", errors="ignore")[:600].lower()
             nm = sk.parent.name
             if any(k in head for k in KW) and nm not in known:
@@ -511,8 +523,44 @@ def p_deps():
                   + (f" ({', '.join(d['name'] for d in ok)})" if ok else "")), ""
 
 
+def p_tidy():
+    """Kho nháp phình? (tidy check, 0 token) — warn, không fail: docs-sprawl là sức khoẻ, không phải lỗi chặn."""
+    t = ROOT / "harness/scripts/tidy.py"
+    if not t.is_file():
+        return "skip", "thiếu harness/scripts/tidy.py", ""
+    r = sh([sys.executable, str(t), "check", "--root", str(ROOT), "--json"], timeout=20)
+    try:
+        s = json.loads(r.stdout or "{}")
+    except Exception:
+        return "skip", "tidy check không parse được", ""
+    if r.returncode == 3:
+        return ("warn", f"draft/ {s.get('draft_top')} file (> {s.get('threshold')}) · outdated {s.get('outdated')} · promote? {s.get('promote')}",
+                "/tidy  (plan → promote bản chất → apply)")
+    return "ok", f"draft/ {s.get('draft_top')} file ≤ ngưỡng {s.get('threshold')}", ""
+
+
+
+def p_swh():
+    """Skill native phải theo solid-what-how/1 (concept [[solid-what-how]]).
+    Chỉ đo CẤU TRÚC — hành vi luôn review_required, không suy ra PASS từ lint."""
+    t = ROOT / "fdk/tools/swh-lint.py"
+    if not t.exists():
+        return "skip", "swh-lint.py chưa có", ""
+    rc, out = sh([PY, str(t), "--json"], timeout=60)
+    try:
+        reps = json.loads(out)
+    except Exception:
+        return "skip", "swh-lint --json không parse được", ""
+    bad = [r["skill_id"] for r in reps if r["structural"] == "fail"]
+    if bad:
+        return ("fail", f"{len(bad)}/{len(reps)} skill native chưa theo SWH: {', '.join(bad[:5])}",
+                "python3 fdk/tools/swh-lint.py  (xem finding) — skill mới sinh bằng new-skill.py đã có khung")
+    return "ok", f"{len(reps)}/{len(reps)} skill native đạt cấu trúc SWH (hành vi: review_required)", ""
+
+
 PROBES = [
     ("rules",    ["rules", "luật", "bite"],      p_rules),
+    ("tidy",     ["tidy", "docs", "draft", "sprawl", "archive"], p_tidy),
     ("coverage", ["rules", "coverage", "luật"],  p_coverage),
     ("drift",    ["drift", "rules"],             lambda: p_rules()),  # drift lộ trong p_rules
     ("backstop", ["backstop", "git", "commit"],  p_backstop),
@@ -530,6 +578,7 @@ PROBES = [
     ("capsurface", ["capsurface", "version", "capabilities", "bump", "downstream"], p_capsurface),
     ("capproof", ["capproof", "proof", "unproven", "ratchet", "dup"], p_capproof),
     ("provenance", ["provenance", "supply-chain", "external-pull", "tamper"], p_provenance),
+    ("swh", ["swh", "skill", "solid", "what-how", "standard"], p_swh),
     ("orchestration", ["orchestration", "orca", "dispatch", "task", "treo"], p_orchestration),
     ("deps", ["deps", "dependency", "code-graph", "orca", "mcp", "ngoài"], p_deps),
 ]

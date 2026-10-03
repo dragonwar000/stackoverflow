@@ -49,6 +49,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 ## Rules
 - 🧰 **Đồ nghề bạn CÓ — đừng làm lại thứ đã tồn tại:** bản đồ năng lực sinh-bằng-code, luôn-mới (ADR-005): repo framework → `fdk/CAPABILITIES.md` (skill+rule+tool); dự án downstream → `CAPABILITIES.md` ở gốc (build-capabilities deploy cạnh hooks, đọc global skills + rule đã cài). Không chắc có gì cho việc đang làm → ĐỌC nó, hoặc `find-skills "<việc>"`. Sinh lại: `python3 fdk/tools/build-capabilities.py` (downstream tự nhận bối cảnh khi chạy với `--root`).
 - **Đang phát triển CHÍNH framework này (skill/rule/validator/script/hook/wiki)? Gọi `/fdk`** — on-demand front-door: pre-flight + không miss rule + không dẫm module cũ. KHÔNG auto-bơm đầu phiên vì phần lớn phiên là dùng framework để dev DỰ ÁN KHÁC (xem `ADR-004`).
+- **Nhiều phiên chung một working tree → KHÔNG `git add -A` / `git add .` / `git commit -a`:** chỉ stage pathspec tường minh của đúng file mình sửa. Phiên khác có thể đang dở việc trên cùng cây, stage hàng loạt sẽ cuốn việc của họ vào commit của mình (2 sự cố 03/07/2026). Ở repo framework, rule P1 `harness-local/validators/no_bulk_stage.py` chặn lệnh này và chặn commit file mà phiên khác ghi lần cuối (`OVS_ALLOW_CROSS_SESSION=1` nếu cố ý). Việc dài thì tách worktree riêng.
 - **Design rule (feedback 2026-06-27):** thứ gì auto-fire/tự-bơm context vào MỌI phiên (hook SessionStart/UserPromptSubmit, dòng auto-load) chỉ được phục vụ *dự án hiện tại*; context *nội-bộ-framework* (FDK, inventory, runbook sửa rule) phải **opt-in** qua skill gọi chủ động. Luật này nằm ở đây (theo repo) vì memory cá nhân là máy-local, kéo repo máy khác sẽ mất. Xem `ADR-004`.
 - FOLLOW the instructions in README.md in wiki folder
 - EVERY wiki file must have an `## Origin` section — source is always traceable
@@ -71,9 +72,15 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `record-episode` | Chốt phiên vào tầng nhớ episodic (mem-rank store) để phiên sau truy hồi "phiên trước làm gì" theo nghĩa | `skills/wiki-loop/record-episode.md` | wiki-loop |
 | `lint` | After every 10 ingests, or wiki feels stale | `skills/wiki-loop/lint.md` | wiki-loop |
 | `playwright-verify` | Verify code nhanh bằng Playwright standalone `.mjs` (không qua test runner): chụp ảnh `localhost`/`file://`, đọc console/pageerror, đo `getBoundingClientRect` khi phần tử "không thấy/không bấm được", auth bypass dev-login. Dùng khi claude-in-chrome bị chặn localhost. | `skills/dev-loop/playwright-verify.md` | dev-loop |
+| `visual-qa` | Workflow tự-kiểm thị giác khép kín cho SPA local — chụp headless từng route → baseline pixel-diff (bắt regression ngoài ý muốn) → bất biến máy-kiểm (contrast AAA, tap-target, overlap, row-misalign) → agent đọc HẾT ảnh theo rubric → FINDINGS.md → sửa → chụp lại; chỉ pass khi máy VÀ mắt cùng sạch. Engine dùng chung bởi `qc-uiux` | `skills/dev-loop/visual-qa.md` | dev-loop |
 | `propose` | Any new feature or change is requested | `skills/dev-loop/propose.md` | dev-loop |
 | `qc-code` | Review code phong cách senior 10 năm — 4 mục (security/performance/naming/logic) điểm/10 + lỗi nặng nhất + fix + verdict PASS/CẦN SỬA; sinh test tái hiện qc-* auto-chạy tất định. KHÁC /orca-sec-scans (Trivy tĩnh) | `skills/dev-loop/qc-code.md` | dev-loop |
-| `teach-me` | Giải thích MỘT thứ ở 2 cấp (hệ thống + code) + bộ ba (vấn đề/workflow/chi tiết os·cơ chế·vai trò) + tóm tắt luồng, mỗi phần có sơ đồ; CHỨNG bằng runtime thật (chạy + breakpoint/debugger), không đoán tĩnh. KHÁC /onboard-codebase (cả dự án→wiki) | `skills/dev-loop/teach-me.md` | dev-loop |
+| `ui-kit-from-code` | Rút hệ thiết kế đang có trong code (token, component) thành 1 trang HTML UI kit kiểu Figma: nền tảng + component theo nhóm + màn mẫu mobile/desktop, đổi theme, copy token/HTML; giá trị lấy bằng cách chạy hàm token thật. Mẫu: `references/ui-kit-reference.html`. KHÁC hallmark (sáng tác) | `skills/dev-loop/ui-kit-from-code.md` | dev-loop |
+| `ui-snapshot` | Nén toàn bộ UI/UX của frontend (React/Next.js/Vue + Tailwind) vào 1 file HTML offline tự chứa: port từng màn sang vanilla JS, class Tailwind chép nguyên văn, dữ liệu placeholder, verify bằng Playwright. Gọi: "snapshot UI", "gói giao diện vào 1 file html", "demo giao diện offline", `/ui-snapshot` |
+| `surface-coverage` | Kiểm "phủ hết" bằng diff với bề mặt thật đọc từ code (trang, route, module API, lệnh): surface.json @commit + sổ phủ coverage.json + gate đỏ khi có mục mới; báo "N/M mục" thay vì đếm artefact | `skills/dev-loop/surface-coverage.md` | dev-loop |
+| `qc-uiux` | Audit UI/UX phong cách senior — 4 mục (accessibility/hierarchy/consistency/antipattern) điểm/10 + lỗi nặng nhất + cách sửa, verdict PASS/CẦN SỬA; phần đo được (contrast WCAG, tap-target, overlap/misalign) chạy tất định qua engine `visual-qa` (0-token, không LLM). KHÁC /qc-code (review code), /redesign-existing-projects (đổi thẩm mỹ) | `skills/dev-loop/qc-uiux.md` | dev-loop |
+| `br` | Dây chuyền sản xuất kiểu Ralph (GH#15): tài liệu thô → `/br interview` (hỏi-bù S1–S10) → `compile` (BR.md có clause_id) → `slice` (frames gác bằng frame-lint) → `run <frame>` (loop-runner 6 phanh + QC tất định) → `qc` (/qc-code + /qc-uiux) → `status` (line-status.html truy ngược lỗi→frame→clause). Tool: `fdk/tools/br-*.py`, `frame-lint.py`, `checkpoint.py`, `build-line-status.py` | `skills/dev-loop/br.md` | dev-loop |
+| `teach-me` | Giải thích MỘT thứ theo khung bảy bước cố định (Tên gọi → Nguồn gốc → Lý do tồn tại → Cơ chế + sơ đồ → Trade-off → Giới hạn → Vị trí), CĂN THEO NGƯỜI NGHE (engineer mặc định · manager · designer · trẻ 5 tuổi "ELI5"…) với TL;DR + phép so sánh mở đầu và So what chốt; CHỨNG bằng runtime thật (chạy + breakpoint/debugger), không đoán tĩnh. KHÁC /onboard-codebase (cả dự án→wiki) | `skills/dev-loop/teach-me.md` | dev-loop |
 | `plan` | SPEC đã DUYỆT → mở rộng thành `-PLAN.md` thi hành được (Files chính xác + Interfaces + code từng bước) TRƯỚC khi dispatch cho agent | `skills/dev-loop/plan.md` | dev-loop |
 | `impact-check` | Before modifying any shared symbol | `skills/dev-loop/impact-check.md` | dev-loop |
 | `safe-change` | Editing code called from more than one place | `skills/dev-loop/safe-change.md` | dev-loop |
@@ -81,6 +88,8 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `ship` | User nhắc release/push/ship — checklist điều kiện trước push & release (medic gate/git sạch/version x.x.x+1/patch note trung thực) | `skills/dev-loop/ship.md` | dev-loop |
 | `ovs-notes` | Xem release notes/changelog — liệt kê các bản (tag/GH release) newest-first để chọn & đọc, read-only (khác /ship = cắt release) | `skills/utils/ovs-notes.md` | utils |
 | `orca-workflow` | Daily propose → gate → dispatch with Orca | `skills/orchestrate/orca-workflow.md` | orchestrate |
+| `orca-graph` | Phân việc dạng đồ thị phụ thuộc: task nào song song / phụ thuộc gì / liên hệ graph cũ; dispatch có khoá+lease, state bền; vẽ graph + atlas | `skills/orchestrate/orca-graph.md` | orchestrate |
+| `tc-run` | Có file test case .xlsx đầy đủ → bóc JSON, phân loại ui/calc/perf/security/gap, PLAN theo lô, chạy qua orca-graph trên phiên đã đăng nhập, xuất report tester-kit mỗi lô | `skills/orchestrate/tc-run.md` | orchestrate |
 | `orca-onboard` | Parallel codebase onboarding with Orca | `skills/orchestrate/orca-onboard.md` | orchestrate |
 | `orca-handover` | Sinh MỘT file .md bàn giao đủ dày để phiên KHÁC (không có context nào) mở ra là làm được ngay — việc dở + thứ tự có lý do + số đo làm bằng chứng + cạm bẫy đã trả giá + hướng đã thử và BỎ. KHÁC record-episode (ghi cho MÁY) và plan (task ĐÃ duyệt, đã rõ) | `skills/orchestrate/orca-handover.md` | orchestrate |
 | `orca-issue` | Sự cố/bug/regression — vòng repro-first → fix red→green → distill kép | `skills/orchestrate/orca-issue.md` | orchestrate |
@@ -90,6 +99,17 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `sync-template` | Upstreaming template improvements to master repo | `skills/utils/sync-template.md` | utils |
 | `md-to-html` | User wants to render a professional HTML report | `skills/utils/md-to-html.md` | utils |
 | `docs-site-macos` | User wants macOS-style documentation site | `skills/utils/docs-site-macos.md` | utils |
+| `dark-mode-maker` | Circle-reveal khi chuyển dark/light mode — tỏa từ con trỏ (kẹp trong biên nút), palette trung tính thị trường, crest-glow liquid-glass, nghiệm thu Playwright. KHÁC docs-site-macos (module toggle dùng cho mọi trang, không riêng docs) | `skills/utils/dark-mode-maker.md` | utils |
+| `timeline` | Component timeline dọc (mốc theo ngày, cuộn-hiện bằng IntersectionObserver, responsive 768px) cho changelog/lịch sử/roadmap. Asset demo dùng dữ liệu giả (faker.js) — phải thay dữ liệu thật trước khi ship | `skills/utils/timeline.md` | utils |
+| `blur` | Hiệu ứng WebGL "zoom blur" chuyển ảnh nền full-screen (Three.js + shader riêng), parallax theo chuột. ⚠ phụ thuộc CDN vào 1 CodePen của người khác — vendor hoá trước khi dùng production | `skills/utils/blur.md` | utils |
+| `scroll-effects` | Hub hiệu ứng cuộn trang: 64 bản GỐC nguyên văn (freefrontend/CodePen, MIT) ở repo `Rheinmir/uiux-asset` — copy nguyên file; kèm 7 hiệu ứng vanilla nhẹ trong assets/ | `skills/utils/scroll-effects.md` | utils |
+| `gsap-scrolltrigger-pin` | GSAP ScrollTrigger pin section + chuyển cuộn dọc thành cuộn ngang (horizontal-scroll section), scrub theo tiến trình cuộn | `skills/utils/gsap-scrolltrigger-pin.md` | utils |
+| `lenis-smooth-scroll` | Thiết lập Lenis (physics-based smooth scroll) cho toàn trang + đồng bộ đúng cách với GSAP ScrollTrigger (ticker/lagSmoothing) | `skills/utils/lenis-smooth-scroll.md` | utils |
+| `threejs-particle-morph` | Three.js particle cloud hội tụ từ ngẫu nhiên thành ảnh (sample pixel qua canvas ẩn) theo tiến trình cuộn | `skills/utils/threejs-particle-morph.md` | utils |
+| `svg-stroke-reveal` | Vẽ dần nét SVG (stroke-dasharray/dashoffset) theo cuộn hoặc khi vào viewport — 2 chế độ liên tục/1-lần | `skills/utils/svg-stroke-reveal.md` | utils |
+| `css-scroll-driven-native` | CSS Scroll-Driven Animations API thuần (`animation-timeline: scroll()/view()`) — zero-JS, có fallback `@supports` | `skills/utils/css-scroll-driven-native.md` | utils |
+| `mask-reveal-transition` | Chuyển/lộ ảnh qua mask hữu cơ (radial-gradient blob loang) hoặc pin split-screen sticky theo cuộn | `skills/utils/mask-reveal-transition.md` | utils |
+| `infinite-webgl-grid` | Lưới ảnh WebGL cuộn/kéo vô hạn qua coordinate-wrapping (Three.js), không tạo mesh mới liên tục | `skills/utils/infinite-webgl-grid.md` | utils |
 | `web-crawl` | Crawl/scrape a URL or site into LLM-ready markdown | `skills/utils/web-crawl.md` | utils |
 | `web-clone` | Clone a website — snapshot (1-file offline copy) or reconstruct (rebuild as editable Next.js code, canonical home for the full-clone pipeline) | `skills/utils/web-clone.md` | utils |
 | `fdk` | Đang phát triển CHÍNH framework (skill/rule/validator/hook/wiki) | `skills/utils/fdk.md` | utils |
@@ -102,7 +122,7 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `council` | Hội đồng nhiều model đánh giá → câu trả lời tốt nhất (Karpathy) | `skills/orchestrate/council.md` | orchestrate |
 | `trace-grader` | Chấm ĐƯỜNG ĐI của agent (tool/thứ tự/pass^k), không chỉ kết quả | `skills/orchestrate/trace-grader.md` | orchestrate |
 | `wikieval` | Bộ eval hồi quy từ wiki goldens (cascade assert + baseline, CI gate) | `skills/dev-loop/wikieval.md` | dev-loop |
-| `docs-curate` | Sắp xếp gọn kho docs local (html/draft phình to): promote bản chất→wiki, archive render, re-index | `skills/utils/docs-curate.md` | utils |
+| `tidy` | Dọn kho nháp/render (ex docs-curate): `check` ngưỡng >10 draft → hỏi đầu phiên; plan → promote bản chất→wiki → apply (git mv vào archive/ tracked, không giết draft sống) | `skills/utils/tidy.md` | utils |
 | `raise-issue` | Raise issue đầy đủ bối cảnh vào ledger local (draft) để dev khác pull về xử lý qua /fdk — feature-gap/tech-debt/foundation (KHÁC orca-issue = bug repro-first) | `skills/utils/raise-issue.md` | utils |
 | `frontier-scan` | Quét đối thủ + đối chiếu overstack 8 trục (gọi instant) — "frontier scan", "chúng ta thua gì" | `skills/utils/frontier-scan.md` | utils |
 | `brandkit` | Premium brand-kit image generation skill for creating high-end… | `skills/utils/brandkit.md` | utils |
@@ -119,8 +139,8 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `caveman-review` | Ultra-compressed code review comments. | `skills/utils/caveman-review.md` | utils |
 | `caveman-stats` | Show real token usage and estimated savings for the current session. | `skills/utils/caveman-stats.md` | utils |
 | `check-approve` | Sinh sẵn 1-liner để trace 1 lệnh approve/return/reject của DMS trên log BE… | `skills/utils/check-approve.md` | utils |
-| `computer-use` | Use Orca's computer-use CLI to inspect and operate local desktop app… | `skills/utils/computer-use.md` | utils |
 | `cursor-animated-sites` | Build an interactive "cursor-animated walkthrough" page on top of the… | `skills/utils/cursor-animated-sites.md` | utils |
+| `design-prim` | Dọn slop UI/UX khi onboard 1 dự án bất kỳ — quét view, chụp playwright, trích thông số qua… | `skills/utils/design-prim.md` | utils |
 | `design-taste-frontend` | Anti-slop frontend skill for landing pages, portfolios, and redesigns. | `skills/utils/design-taste-frontend.md` | utils |
 | `design-taste-frontend-v1` | The original v1 taste-skill, preserved for projects depending on its exact… | `skills/utils/design-taste-frontend-v1.md` | utils |
 | `extract-site` | Extract and convert a website or docs site into clean markdown (full-code clone → see `web-clone`) | `skills/utils/extract-site.md` | utils |
@@ -143,11 +163,9 @@ Karpathy ở trên là "vì sao"; đây là "làm sao". (Chưng cất từ ponyt
 | `agent-reach` | Với-tới internet 15 nền (X/Reddit/YT/GitHub/Bilibili/XHS…), zero-API-fee, doctor self-heal — external-pull | `skills/utils/agent-reach.md` | utils |
 | `minimalist-ui` | Clean editorial-style interfaces. | `skills/utils/minimalist-ui.md` | utils |
 | `new-project-setup` | Deploy llmwiki từ đầu vào project mới — template pull, skill install, RTK,… | `skills/dev-loop/new-project-setup.md` | dev-loop |
-| `orca-cli` | Use the public `orca` CLI to operate Orca-managed worktrees/workspaces,… | `skills/orchestrate/orca-cli.md` | orchestrate |
 | `orca-dispatch-reference` | Reference for Antigravity/OpenCode dispatch, skill installation,… | `skills/orchestrate/orca-dispatch-reference.md` | orchestrate |
 | `orca-eval` | Quét N session Claude Code gần nhất, distill best practices thành report… | `skills/orchestrate/orca-eval.md` | orchestrate |
 | `orca-sec-scans` | Quét bảo mật mã nguồn bằng Trivy — tự check/cài Trivy nếu chưa có, quét… | `skills/orchestrate/orca-sec-scans.md` | orchestrate |
-| `orchestration` | Use Orca orchestration for structured multi-agent coordination: threaded… | `skills/orchestrate/orchestration.md` | orchestrate |
 | `redesign-existing-projects` | Upgrades existing websites and apps to premium quality. | `skills/utils/redesign-existing-projects.md` | utils |
 | `snapshot-push` | Push bonbon-ai outer repo as full snapshot, including be/ and fe/ content | `skills/utils/snapshot-push.md` | utils |
 | `stitch-design-taste` | Semantic Design System Skill for Google Stitch. | `skills/utils/stitch-design-taste.md` | utils |

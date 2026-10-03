@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 
-from hooklib import audit, code_log, find_validators, project_dir, read_payload, resolve_tool, run_validator, scope_config
+from hooklib import running_servers, servers_message, audit, code_log, find_validators, harness_dir, overstack_dir, project_dir, read_payload, resolve_tool, run_validator, scope_config, stamp_path, session_touched_files, touched_message, session_new_html, new_html_message, session_graphs, graphs_message
 
 
 # file code (đa ngôn ngữ) trong git-status → trigger regen phần code-graph của wiki-graph.
@@ -24,12 +24,34 @@ _CODE_RE = re.compile(r"\.(py|js|jsx|ts|tsx|mjs|cjs|go|rs|java|rb|php|c|h|cpp|cc
 # code-graph). KHÔNG đổi thuật toán generator (build-wiki-graph.py là engine dùng chung, sửa
 # sai lan rộng — để dành cho /propose riêng nếu cần incremental thật). Window là default CHƯA
 # đo trên hành vi thật, chỉnh qua biến môi trường khi cần, không phải hằng số thiêng.
-_DEBOUNCE_STATE = "harness/metrics/.stop-debounce.json"
 _DEBOUNCE_WINDOW_S = int(os.environ.get("OVERSTACK_STOP_DEBOUNCE_S", "180"))
+
+# NGÂN SÁCH TỔNG (sig hook-timeout|Stop:stop.py|, 731 lần/30 ngày): Claude Code giết cả hook ở 30s,
+# trong khi timeout con cộng lại >500s → bước nặng ăn hết giờ, cổng R3 đứng cuối không bao giờ chạy.
+# Mọi subprocess đi qua _run(): timeout bị kẹp vào phần ngân sách còn lại; bước trước khối R3 chừa
+# _RESERVE_S cho R3. Hết ngân sách → TimeoutExpired, caller vốn đã fail-open bằng except.
+# shortcut: bước nặng (medic --ci ~42s) bị cắt chứ không chạy nền, đổi sang Popen nền khi cần kết quả medic mỗi lượt.
+_T0 = time.monotonic()
+_BUDGET_S = float(os.environ.get("OVERSTACK_STOP_BUDGET_S", "20"))
+_RESERVE_S = 6.0
+# Trần CỨNG cho phần chạy sau ngân sách (validator R3, link server R21) — Claude Code giết hook ở 30s (GH#177).
+_HARD_S = 27.0
+
+
+def _run(cmd, timeout, reserve=_RESERVE_S, **kw):
+    left = _T0 + _BUDGET_S - reserve - time.monotonic()
+    if left < 1:
+        raise subprocess.TimeoutExpired(cmd, 0)
+    return subprocess.run(cmd, timeout=min(timeout, left), **kw)
+
+
+def _debounce_path(root: str) -> str:
+    """.harness/metrics ở dự án khách, harness/metrics ở repo framework (hooklib.harness_dir)."""
+    return os.path.join(str(harness_dir(root)), "metrics", ".stop-debounce.json")
 
 
 def _debounce_state(root: str) -> dict:
-    path = os.path.join(root, _DEBOUNCE_STATE)
+    path = _debounce_path(root)
     try:
         return json.load(open(path, encoding="utf-8")) if os.path.isfile(path) else {}
     except Exception:
@@ -37,7 +59,7 @@ def _debounce_state(root: str) -> dict:
 
 
 def _debounce_mark(root: str, key: str, ok: bool = True) -> None:
-    path = os.path.join(root, _DEBOUNCE_STATE)
+    path = _debounce_path(root)
     state = _debounce_state(root)
     state[key] = {"ts": time.time(), "ok": ok}
     try:
@@ -62,9 +84,11 @@ def _debounced(root: str, key: str, require_ok: bool = False) -> bool:
 
 
 def _scope_config(root: str):
-    """GH#49 — MỘT nguồn: hooklib.scope_config(). Fallback = hành vi cũ (llmwiki/wiki + '.')."""
+    """GH#49 — MỘT nguồn: hooklib.scope_config(). Fallback = <thư mục overstack đang dùng>/wiki
+    (.llmwiki ở dự án khách, llmwiki ở repo framework) + '.'."""
     c = scope_config(root)
-    return c["wiki_dir"] or "llmwiki/wiki", c["code_root"] or "."
+    od = overstack_dir(root)
+    return c["wiki_dir"] or (f"{od.name}/wiki" if od else "llmwiki/wiki"), c["code_root"] or "."
 
 
 def regen_docs(root: str) -> None:
@@ -89,12 +113,12 @@ def regen_docs(root: str) -> None:
     # nhánh `--global` (đường bootstrap thật) exit TRƯỚC 4b nên không repo downstream nào có → graph
     # không bao giờ regen (GH#70). Khoá enablement vào chính stamp (đã gate hook) làm vòng tự-nhất-quán:
     # tín hiệu bật hook = tín hiệu bật wiki-graph. Giữ env cũ làm override tương thích ngược.
-    has_stamp = os.path.isfile(os.path.join(root, "llmwiki", ".harness-stamp"))
+    has_stamp = stamp_path(root) is not None
     wikigraph_on = bool(wg) and (is_framework or has_stamp or os.environ.get("OVERSTACK_WIKIGRAPH") == "1")
     if not is_framework and not wikigraph_on:
         return  # không phải framework và cũng không bật wiki-graph downstream → bỏ hẳn (rẻ)
     try:
-        st = subprocess.run(["git", "status", "--porcelain"], cwd=root,
+        st = _run(["git", "status", "--porcelain"], cwd=root,
                             capture_output=True, text=True, timeout=8).stdout
         # (A) chỉ repo framework: skill/rule/generator đổi → overstack + CAPABILITIES + skill-search
         if is_framework and re.search(r"(skills/.*SKILL\.md|llmwiki/skills/|policy\.yaml|"
@@ -103,9 +127,9 @@ def regen_docs(root: str) -> None:
             # NGAY cuối lượt, để 2 cây không stale tạm thời (trước đây phải cp tay → gate mới bắt).
             ss = os.path.join(root, "harness", "scripts", "sync-skills.py")
             if os.path.isfile(ss):
-                subprocess.run([sys.executable, ss], capture_output=True, timeout=40)
+                _run([sys.executable, ss], capture_output=True, timeout=40)
             for t in ("build-capabilities.py", "build-overstack-docs.py", "build-skill-search.py"):
-                subprocess.run([sys.executable, os.path.join(td, t)], capture_output=True, timeout=40)
+                _run([sys.executable, os.path.join(td, t)], capture_output=True, timeout=40)
         # (B) wiki-graph.html: nội dung wiki, engine, HOẶC file code đổi → dựng lại.
         # GH#49: scope KHAI TƯỜNG MINH qua .overstack.yaml (wiki_dir + code_root) — relocate/thu hẹp
         # vùng index, tách được mẹ/con; thiếu config → mặc định cũ (llmwiki/wiki + root). cwd=root vì
@@ -114,7 +138,11 @@ def regen_docs(root: str) -> None:
                 and not _debounced(root, "wiki-graph")):
             wiki_dir, code_root = _scope_config(root)
             also = ["--also", "fdk/wiki"] if os.path.isdir(os.path.join(root, "fdk", "wiki")) else []
-            subprocess.run([sys.executable, wg, wiki_dir, *also, "--code-root", code_root],
+            # build-wiki-graph.py mặc định ghi vào llmwiki/html (cứng) → truyền -o theo thư mục
+            # overstack đang dùng (.llmwiki ở dự án khách, llmwiki ở repo framework).
+            od = overstack_dir(root)
+            out = ["-o", str(od / "html" / "wiki-graph.html")] if od else []
+            _run([sys.executable, wg, wiki_dir, *also, "--code-root", code_root, *out],
                            cwd=root, capture_output=True, timeout=90)
             _debounce_mark(root, "wiki-graph")
         # T5 (provenance-log, T-260722-01): phân loại file đổi theo path-prefix, ghi sự kiện
@@ -122,7 +150,7 @@ def regen_docs(root: str) -> None:
         # — cùng pattern subprocess.run([sys.executable, wg, ...]) đã dùng cho wiki-graph ở trên.
         pl = resolve_tool(root, "harness/scripts/provenance-log.py")
         if pl:
-            subprocess.run([sys.executable, pl, "record-changed", "--root", root],
+            _run([sys.executable, pl, "record-changed", "--root", root],
                            cwd=root, capture_output=True, timeout=30)
         # token-budget: đồng bộ token THẬT từ cost-by-session.json (code-logger đã ghi).
         # Trước đây KHÔNG hook nào gọi `record`, nên tokens.jsonl chưa từng tồn tại và mọi
@@ -130,14 +158,14 @@ def regen_docs(root: str) -> None:
         # Đọc lại nguồn có sẵn thay vì dựng đường ghi song song (tránh hai sổ lệch nhau).
         tb = resolve_tool(root, "harness/scripts/token-budget.py")
         if tb:
-            subprocess.run([sys.executable, tb, "sync", "--root", root],
+            _run([sys.executable, tb, "sync", "--root", root],
                            cwd=root, capture_output=True, timeout=30)
         # agent-trace: chưng cất transcript phiên (chính + mọi subagent worktree) thành sổ
         # kiểm chứng được. TỰ NO-OP khi công tắc tắt — mặc định tắt, nên hook này không tốn
         # gì cho ai chưa bật. Bật: python3 harness/scripts/agent-trace.py on
         at = resolve_tool(root, "harness/scripts/agent-trace.py")
         if at:
-            subprocess.run([sys.executable, at, "collect", "--root", root],
+            _run([sys.executable, at, "collect", "--root", root],
                            cwd=root, capture_output=True, timeout=60)
     except Exception:
         pass
@@ -148,7 +176,7 @@ def secondary_memory(root: str, session: str) -> None:
     để context/sửa-vụn được lưu durable + visualizable mà KHÔNG cần agent nhớ gõ tay (leverage
     Meadows #6 — cấu trúc luồng thông tin, không phải kỷ luật người). Mỗi lần dừng, khi phiên có
     SỬA thật (git dirty): (a) `scratch-log auto` tự điền why từ git nếu phiên chưa có why thủ công;
-    (b) `scratch-log distill` gom → sources/DDMMYY-session-provenance.md; (c) `memory-map` regenerate
+    (b) `scratch-log distill` gom → sources/provenance/DDMMYY-session-provenance.md; (c) `memory-map` regenerate
     llmwiki/html/memory-map.html; (d) `mem-rank episode` tự ghi episode có-cấu-trúc (did=commit subject,
     files=đổi trong phiên) vào tầng episodic — trước bản vá này layer này CHƯA từng được gọi tự động
     (memory.jsonl rỗng, phải gõ tay `/record-episode`); giờ mỗi phiên có sửa thật đều để lại 1 episode
@@ -160,11 +188,11 @@ def secondary_memory(root: str, session: str) -> None:
     if not sl:
         return  # thiếu engine (local+global) → bỏ (fail-open)
     is_framework = os.path.isfile(os.path.join(root, "fdk", "tools", "build-overstack-docs.py"))
-    has_stamp = os.path.isfile(os.path.join(root, "llmwiki", ".harness-stamp"))
+    has_stamp = stamp_path(root) is not None
     if not (is_framework or has_stamp or os.environ.get("OVERSTACK_WIKIGRAPH") == "1"):
         return  # downstream chưa bootstrap (không stamp) → bỏ
     try:
-        dirty = subprocess.run(["git", "status", "--porcelain"], cwd=root,
+        dirty = _run(["git", "status", "--porcelain"], cwd=root,
                                capture_output=True, text=True, timeout=8).stdout
     except Exception:
         return
@@ -174,24 +202,24 @@ def secondary_memory(root: str, session: str) -> None:
     today = datetime.date.today().isoformat()
     mm = resolve_tool(root, "fdk/tools/memory-map.py")
     try:
-        subprocess.run([sys.executable, sl, "auto", "--session", session, "--root", root],
+        _run([sys.executable, sl, "auto", "--session", session, "--root", root],
                        cwd=root, capture_output=True, timeout=20)
-        subprocess.run([sys.executable, sl, "distill", "--session", session, "--date", today],
+        _run([sys.executable, sl, "distill", "--session", session, "--date", today],
                        cwd=root, capture_output=True, timeout=20)
         if mm:
-            subprocess.run([sys.executable, mm], cwd=root, capture_output=True, timeout=40)
+            _run([sys.executable, mm], cwd=root, capture_output=True, timeout=40)
     except Exception:
         pass
     mr = resolve_tool(root, "harness/scripts/mem-rank.py")
     if mr:
         try:
-            subject = subprocess.run(["git", "log", "-1", "--format=%s"], cwd=root,
+            subject = _run(["git", "log", "-1", "--format=%s"], cwd=root,
                                       capture_output=True, text=True, timeout=8).stdout.strip()
             changed = [ln[3:] for ln in dirty.splitlines() if len(ln) > 3][:8]
             did = subject or "(phiên có sửa, chưa commit)"
             # --parent auto: nối episode này vào phiên NGAY TRƯỚC → một CHUỖI đọc được
             # (mem-rank chain), thay vì một đống episode rời không biết cái nào tiếp cái nào.
-            subprocess.run([sys.executable, mr, "episode", did,
+            _run([sys.executable, mr, "episode", did,
                              "--files", ",".join(changed), "--session", session, "--parent", "auto"],
                            cwd=root, capture_output=True, timeout=15)
         except Exception:
@@ -220,7 +248,7 @@ def framework_medic_mirror(root: str) -> int:
     if not os.path.isfile(medic):
         return 0  # không phải repo framework → không soi
     try:
-        st = subprocess.run(["git", "status", "--porcelain"], cwd=root,
+        st = _run(["git", "status", "--porcelain"], cwd=root,
                             capture_output=True, text=True, timeout=8).stdout
     except Exception:
         return 0
@@ -231,8 +259,12 @@ def framework_medic_mirror(root: str) -> int:
     if _debounced(root, "medic", require_ok=True):
         return 0
     try:
-        p = subprocess.run([sys.executable, medic, "--ci"], cwd=root,
+        p = _run([sys.executable, medic, "--ci"], cwd=root,
                            capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        print("🩺 [medic gương-soi] bỏ qua: vượt ngân sách Stop hook — chạy tay `python3 fdk/tools/medic.py --ci`",
+              file=sys.stderr)
+        return 0
     except Exception:
         return 0  # medic lỗi/timeout không được chặn người dùng
     if p.returncode == 0:
@@ -256,7 +288,7 @@ def dym_drift_mirror(root: str) -> int:
     if not os.path.isfile(tool):
         return 0
     try:
-        st = subprocess.run(["git", "status", "--porcelain"], cwd=root, capture_output=True, text=True, timeout=8).stdout
+        st = _run(["git", "status", "--porcelain"], cwd=root, capture_output=True, text=True, timeout=8).stdout
     except Exception:
         return 0
     if ".overstack/doyourmagic/" not in st:
@@ -264,7 +296,7 @@ def dym_drift_mirror(root: str) -> int:
     if _debounced(root, "dym", require_ok=True):
         return 0
     try:
-        p = subprocess.run([sys.executable, tool, "check", "--json"], cwd=root, capture_output=True,
+        p = _run([sys.executable, tool, "check", "--json"], cwd=root, capture_output=True,
                            text=True, timeout=40, stdin=subprocess.DEVNULL)
         data = json.loads(p.stdout.strip().splitlines()[-1])
     except Exception:
@@ -282,9 +314,9 @@ def dym_drift_mirror(root: str) -> int:
 
 def wiki_changed(root: str) -> bool:
     try:
-        out = subprocess.run(
+        out = _run(
             ["git", "status", "--porcelain"],
-            cwd=root, capture_output=True, text=True, timeout=10,
+            cwd=root, capture_output=True, text=True, timeout=10, reserve=0,
         ).stdout
         return "wiki/" in out
     except Exception:
@@ -370,7 +402,7 @@ def main() -> None:
         ok_tool = resolve_tool(root, "harness/scripts/okf-scan.py")
         if ok_tool:
             try:
-                subprocess.run([sys.executable, ok_tool, "verify", "--session",
+                _run([sys.executable, ok_tool, "verify", "--session",
                                 payload.get("session_id") or "", "--transcript", tp, "--root", root],
                                cwd=root, capture_output=True, timeout=20)
             except Exception:
@@ -418,11 +450,14 @@ def main() -> None:
     errs = []
     for wiki in wikis:
         try:
-            subprocess.run([sys.executable, os.path.join(vdir, "index_sync.py"),
-                            "--wiki-dir", str(wiki), "--fix"], capture_output=True, timeout=15)
+            _run([sys.executable, os.path.join(vdir, "index_sync.py"),
+                            "--wiki-dir", str(wiki), "--fix"], capture_output=True, timeout=15,
+                 reserve=_BUDGET_S - _HARD_S + 3)  # R3 là cổng bắt buộc: chạy tới trần cứng, không dừng ở ngân sách mềm
         except Exception:
             pass
-        rc, err = run_validator("index_sync.py", {"action": "stop", "wiki_dir": str(wiki)}, vdir)
+        # run_validator có timeout riêng 30s → kẹp theo _HARD_S, nếu không lượt tải cao vượt trần hook 30s (GH#177)
+        rc, err = run_validator("index_sync.py", {"action": "stop", "wiki_dir": str(wiki)}, vdir,
+                                timeout=max(1.0, _T0 + _HARD_S - 3 - time.monotonic()))
         if rc == 2:
             errs.append(err)
     if errs:
@@ -431,5 +466,68 @@ def main() -> None:
     sys.exit(0)
 
 
+def _collapse(msg: str, session: str):
+    """UI không gập được systemMessage → gập bằng tay: bản đủ ghi ra file tạm, UI chỉ thấy 1 dòng đếm + link
+    (bấm = bung). Trả None khi cùng phiên vừa in đúng nội dung này (<120s) — repo framework đăng ký CẢ hook
+    dự án lẫn hook global nên stop.py chạy 2 lần mỗi lượt. OVERSTACK_TOUCHED_FULL=1 → in đủ như cũ."""
+    import hashlib
+    import tempfile
+    import time
+    d = os.path.join(tempfile.gettempdir(), "overstack-r21")
+    os.makedirs(d, exist_ok=True)
+    full = os.path.join(d, f"{session or 'nosession'}.md")
+    mark = f"{full}.{hashlib.sha1(msg.encode()).hexdigest()[:12]}"
+    try:  # 2 hook Stop chạy SONG SONG → khoá nguyên tử O_EXCL, ai tạo được marker trước thì in
+        if time.time() - os.path.getmtime(mark) >= 120:
+            os.remove(mark)
+    except OSError:
+        pass
+    try:
+        os.close(os.open(mark, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+    except FileExistsError:
+        return None
+    with open(full, "w", encoding="utf-8") as fh:
+        fh.write(msg + "\n")
+    if os.environ.get("OVERSTACK_TOUCHED_FULL") == "1":
+        return msg
+    # OSC 8 = link ẩn sau chữ (thẻ <a> của terminal): chỉ hiện TIÊU ĐỀ, bấm mở — gọn mà vẫn bấm được.
+    # Terminal không hiểu OSC 8 sẽ lộ mã → OVERSTACK_TOUCHED_OSC8=0 quay về dạng đếm + link thô.
+    osc8 = os.environ.get("OVERSTACK_TOUCHED_OSC8") != "0"
+    a = (lambda url, text: f"\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\") if osc8 else (lambda url, text: f"{text} <{url}>")
+    # Feedback 280926 "tui cần cái graph phân việc thôi" + "thứ hai là file html tạo mới trong .llmwiki/html": dòng gọn CHỈ còn
+    # (1) trang orca-graph `[graph]` rồi (2) HTML sinh mới `[newhtml]`; PLAN/md/server/"file khác" chỉ nằm trong bản đủ sau
+    # link "chi tiết". Phiên không có cả hai → không in dòng.
+    graphs = re.findall(r"• \[graph\] (.+)\n\s+(file://\S+)", msg)
+    news = [x for x in re.findall(r"• \[newhtml\] (.+)\n\s+(file://\S+)", msg) if x not in graphs]
+    if not graphs and not news:
+        return None
+    parts = [a(url, title) for title, url in graphs] + [f"🆕 {a(url, title)}" for title, url in news]
+    return f"📖 [R21] {' · '.join(parts)} · {a('file://' + full, 'chi tiết')}"
+
+
+def _emit_touched(payload: dict) -> None:
+    """R21: exit 0 nào cũng in danh sách path cho USER (systemMessage — hiện thẳng ở UI, 0 token
+    của model), dạng GẬP 1 dòng (xem _collapse). Exit 2 (đang chặn dừng) thì bỏ: lượt dừng thật kế tiếp sẽ in."""
+    try:
+        root = project_dir(payload)
+        tp = payload.get("transcript_path") or ""
+        msg = "\n".join(x for x in (graphs_message(session_graphs(root, tp)), new_html_message(session_new_html(root, tp)),
+                                    touched_message(session_touched_files(root, tp))) if x)
+        if os.environ.get("OVERSTACK_TOUCHED_SERVERS") != "0":          # link server đang chạy: localhost trong dự án + hostname thật qua tunnel
+            msg = "\n".join(x for x in (msg, servers_message(running_servers(root, deadline=_T0 + _HARD_S))) if x)
+        msg = msg and _collapse(msg, payload.get("session_id") or "")
+        if msg:
+            print(json.dumps({"systemMessage": msg}, ensure_ascii=False))
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
-    main()
+    _payload = read_payload()
+    read_payload = lambda: _payload  # noqa: E731 — main() đọc lại payload; stdin chỉ đọc được 1 lần
+    try:
+        main()
+    except SystemExit as e:
+        if e.code in (0, None) and os.environ.get("OVERSTACK_TOUCHED_PATHS") != "0":
+            _emit_touched(_payload)
+        raise

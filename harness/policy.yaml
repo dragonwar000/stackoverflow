@@ -168,3 +168,30 @@ rules:
     applies_to: [write]
     scope: "wiki/**/*.md có chứa khối ```evidence-chain; tài liệu DẠY chính định dạng này khai `r19_meta: true` để miễn"
     note: "Công tắc 3 tầng ưu tiên từ hẹp tới rộng: cờ --no-evidence-chain > env OVERSTACK_EVIDENCE_TERMINAL > `enabled` trong harness/evidence-terminal.config.yaml. Tắt ở tầng nào cũng in một dòng lên stderr — cổng câm nguy hiểm hơn cổng đỏ."
+
+  - id: R20
+    name: html-docs-shell
+    validator: html_docs_shell.py
+    statement: 'Trang HTML nằm trực tiếp trong một thư mục html/ phải có vỏ tài liệu nhất quán, bất kể skill nào sinh: (a) hơn 3 mục (<section id> hoặc <h2>) thì phải có <nav> chứa ít nhất 3 link #anchor; (b) sơ đồ archify nhúng qua <iframe> phải dùng preset macos như trang chứa. Thoát tường minh: <meta name="overstack-nav" content="none"> / <meta name="overstack-preset" content="<preset>">.'
+    enforce_at: [session]
+    applies_to: [write]
+    scope: "**/html/*.html (miễn chính artifact archify)"
+    note: "PostToolUse nhánh .html cùng R16 (llmwiki/.claude/hooks/post_tool_use.py). Nguồn: GH#155 (trang 11 mục không menu vì agent chỉ bắt chước look docs-site-macos) + GH#154 (sơ đồ nhúng preset signal-flow lệch theme)."
+
+  - id: R22
+    name: html-slop
+    validator: html_slop.py
+    statement: 'Trang HTML nằm trực tiếp trong một thư mục html/ không được mang ba dấu hiệu AI-slop mà cổng tĩnh đã có luật: (a) sọc viền MÀU một cạnh (border-left|right >= 3px solid màu bão hoà) trên thẻ/nút/callout; (b) gradient-text (background-clip:text + chữ trong suốt); (c) thiếu chế độ tối (không [data-theme=dark], không prefers-color-scheme). Artifact archify được miễn (viewer tự chứa, như R16/R20).'
+    enforce_at: [session]
+    applies_to: [write]
+    scope: "**/html/*.html (miễn chính artifact archify)"
+    note: "PostToolUse nhánh .html cùng R16/R20. Validator GỌI fdk/tools/frontend-antipattern.py chứ không chép regex, nên hai cổng không lệch luật; vá máy-làm-được bằng fdk/tools/html-slop-fix.py. Nguồn: user 20/09/2026 'cơ chế bắt slop bắt buộc chưa tự bắt nó' — medic trước đó chỉ soi 1 trang nên luôn xanh."
+
+  - id: R21
+    name: touched-paths
+    validator: stop.py
+    statement: "Stop: cuối MỖI lượt, hook in cho user (systemMessage, 0 token của model) hai khối. (1) Trang NGƯỜI ĐỌC phiên này tạo/sửa trong wiki (.md/.html dưới llmwiki/, .llmwiki/, fdk/wiki/ — trừ index/log/provenance/raw/skills và trang tự sinh lại như atlas, control-room, overstack.html): mỗi dòng ghi TIÊU ĐỀ THẬT của trang (frontmatter title hoặc <title>) kèm link file:// tuyệt đối, thứ tự HTML → graph → PLAN → còn lại, trần 10 (dư ghi +N). (2) Mọi file khác KHÔNG rải path: một dòng mỗi nhóm (test · skill · dữ liệu graph/sổ máy · trang tự sinh lại · CI/cấu hình · raw · code · tài liệu ngoài wiki · khác) gồm nhãn + số lượng + tối đa 3 tên. (3) Server ĐANG CHẠY để bấm mở: process đang LISTEN có cwd nằm trong dự án → http://localhost:PORT/ kèm lệnh + thư mục chạy; nếu một cloudflared đang chạy trỏ ingress về port đó thì in hostname thật bên cạnh (⇄ https://…); hostname tunnel đang sống trỏ dịch vụ ngoài cũng được liệt kê. Chỉ đọc lsof/ps/config tunnel, không mở kết nối. Tắt riêng OVERSTACK_TOUCHED_SERVERS=0. Nguồn: Write/Edit trong transcript + git status mtime >= mốc đầu phiên + file thuộc commit tạo trong phiên. Tắt OVERSTACK_TOUCHED_PATHS=0; trần OVERSTACK_TOUCHED_CAP."
+    enforce_at: [session]
+    event: Stop
+    event_action: stop
+    note: "llmwiki/.claude/hooks/stop.py::_emit_touched · hooklib.session_touched_files/touched_message. Nguồn: feedback user 19/09/2026 'path đâu mà coi?' + 20/09/2026 '40 file annoying — chỉ cần trang người đọc, mỗi dòng phải ghi nó là gì'."

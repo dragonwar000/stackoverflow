@@ -56,9 +56,12 @@ harness/metrics/sweep-marker.json
 scratchpad/
 fdk/docs/superpowers/
 
+# node_modules cục bộ cho script bundle trong skill (vd docs-site-macos/scripts/) — cài lại bằng package.json cạnh nó
+node_modules/
+
 # flywheel success-flywheel raw history (local)
 harness/metrics/successes.jsonl
-llmwiki/wiki/sources/draft/archive/
+# llmwiki/wiki/sources/draft/archive/ được TRACK từ 2026-09-09 (tidy, D1): archive phải travel theo clone
 
 # mem-rank local memory store
 harness/metrics/memory.jsonl
@@ -71,3 +74,26 @@ harness/metrics/context-receipts.jsonl
 
 # .overstack/kit — sandbox clone overstack (fdk-kit.sh pull), local-only
 .overstack/kit/
+
+# handover tự sinh khi phiên hết ngân sách (per-terminal, đã consume) + artifact visual-check của viewport-check
+llmwiki/handover/
+*.visual-check.*
+
+# orca-graph: lockfile runtime, không track
+llmwiki/graph/*.locks/
+llmwiki/graph/.admission.lock*
+
+# Dự án ngoài harness (nightshift, Reprise Intent Engine): tài liệu làm việc giữ ở máy, không track.
+# Code của chúng nằm ở repo riêng (Rheinmir/nightshift).
+llmwiki/graph/230926-nightshift-*
+llmwiki/graph/230926-rie-*
+llmwiki/graph/240926-intent-manifest-ui-*
+llmwiki/html/240926-intent-manifest-ui-*
+llmwiki/html/*nightshift*
+llmwiki/html/230926-overnight-loop-prd*
+llmwiki/raw/prd/Reprise-Intent-Engine-*
+llmwiki/wiki/sources/230926-reprise-intent-engine-prd.md
+llmwiki/wiki/sources/draft/230926-nightshift-*
+llmwiki/wiki/sources/draft/230926-overnight-loop-PRD.md
+llmwiki/wiki/sources/draft/230926-rie-*
+llmwiki/wiki/sources/draft/240926-intent-manifest-ui-*

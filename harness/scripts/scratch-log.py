@@ -16,15 +16,26 @@ CLI:
   scratch-log.py note "<vì sao / context vụn>" [--file PATH] [--session ID] [--action edit]
         → append 1 entry vào harness/metrics/scratch-log.jsonl (append-only)
   scratch-log.py distill [--session ID] [--date YYYY-MM-DD]
-        → gom scratch-log + wiki-ledger theo phiên → sources/DDMMYY-session-provenance.md
+        → gom scratch-log + wiki-ledger theo phiên → sources/provenance/DDMMYY-session-provenance.md
            (distill KHÔNG xoá thô, chỉ trỏ về)
   scratch-log.py show [--session ID] [-n 20]   → in các entry gần nhất (đọc bằng mắt)
 """
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from overstack_paths import harness_dir as _harness_dir
+except Exception:          # bản cài cũ thiếu overstack_paths → giữ hành vi cũ
+    _harness_dir = None
+
+
+def _metrics_dir(root) -> Path:
+    return (_harness_dir(root) if _harness_dir else Path(root) / "harness") / "metrics"
 
 
 def repo_root() -> Path:
@@ -41,8 +52,7 @@ def repo_root() -> Path:
 
 
 ROOT = repo_root()
-LOG = ROOT / "harness" / "metrics" / "scratch-log.jsonl"
-LEDGER = ROOT / "llmwiki" / "wiki" / "ledger.jsonl"
+LOG = _metrics_dir(ROOT) / "scratch-log.jsonl"
 
 
 def _now_iso():
@@ -158,9 +168,22 @@ def auto(args):
 def distill(args):
     """Gom scratch-log + wiki-ledger cho MỘT phiên → session-provenance.md (tầng distill).
     KHÔNG xoá thô — chỉ trỏ về file scratch-log.jsonl."""
+    # import tại chỗ: note/auto không cần wiki → thiếu overstack_paths chỉ làm distill bỏ qua.
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from overstack_paths import project_wiki
+        wiki = project_wiki(ROOT)[0]
+    except (ImportError, ValueError) as e:
+        wiki = None
+        print(f"distill: {e}", file=sys.stderr)
+    if wiki is None:
+        # GH#153: không bao giờ tự đẻ cây wiki mới (từng tạo llmwiki/ lạc ở dự án dùng .llmwiki).
+        print("distill: bỏ qua — không dò được wiki của dự án")
+        return 0
+    ledger_path = wiki / "ledger.jsonl"
     sess = args.session
     scratch = [r for r in _read(LOG) if not sess or r.get("session") == sess]
-    ledger = [r for r in _read(LEDGER) if not sess or (r.get("session") or "").startswith((sess or "")[:8])]
+    ledger = [r for r in _read(ledger_path) if not sess or (r.get("session") or "").startswith((sess or "")[:8])]
     if not sess and scratch:
         sess = scratch[-1].get("session", "")
     whys = [r for r in scratch if (r.get("why") or "").strip()]
@@ -170,7 +193,7 @@ def distill(args):
     ddmmyy = date  # DDMMYY khớp convention framework (030726)
     if len(date) == 10 and date[4] == "-":     # YYYY-MM-DD → DDMMYY
         ddmmyy = date[8:10] + date[5:7] + date[2:4]
-    out = ROOT / "llmwiki" / "wiki" / "sources" / f"{ddmmyy}-session-provenance.md"
+    out = wiki / "sources" / "provenance" / f"{ddmmyy}-session-provenance.md"
     lines = [
         "---", "type: source",
         f'title: "session-provenance {sess[:8]} (auto-distill scratch-log)"',
@@ -178,7 +201,7 @@ def distill(args):
         f'timestamp: {date}', f'session: {sess}', "---", "",
         f"# session-provenance {sess[:8]} — auto-distill",
         "",
-        f"**Nguồn thô (KHÔNG xoá):** `harness/metrics/scratch-log.jsonl` · `llmwiki/wiki/ledger.jsonl` (session {sess[:8]}).",
+        f"**Nguồn thô (KHÔNG xoá):** `harness/metrics/scratch-log.jsonl` · `{Path(os.path.relpath(ledger_path, ROOT)).as_posix()}` (session {sess[:8]}).",
         "",
         "## Vì sao (context vụn — distill từ scratch-log)",
     ]

@@ -6,6 +6,7 @@ Contract: `index_sync.py --wiki-dir path/to/wiki` (CLI/pre-commit/Stop hook)
 Exit 0 = khớp, exit 2 = lệch (liệt kê thiếu/thừa trên stderr).
 """
 import json
+import os
 import re
 import subprocess
 import sys
@@ -13,6 +14,17 @@ from pathlib import Path
 
 SKIP_BASENAMES = {"README.md", "_template.md"}
 _IGN_CACHE: dict[str, bool] = {}
+
+
+def _git_env() -> dict:
+    """Hook git trong linked worktree đặt GIT_DIR (không kèm GIT_WORK_TREE). Khi đó git con chạy
+    với cwd khác gốc worktree sẽ coi cwd là gốc work tree → ls-files/check-ignore sai hết (đo
+    2026-09-13: --show-toplevel = …/fdk/wiki, mọi trang wiki '??'). Bỏ GIT_DIR để git tự dò repo từ
+    cwd; GIT_INDEX_FILE giữ nguyên vì đó là index đúng của lần commit đang chạy."""
+    env = dict(os.environ)
+    if "GIT_DIR" in env and "GIT_WORK_TREE" not in env:
+        env.pop("GIT_DIR")
+    return env
 
 
 def gitignored(rel: str, wiki: Path) -> bool:
@@ -36,11 +48,38 @@ def gitignored(rel: str, wiki: Path) -> bool:
     if full not in _IGN_CACHE:
         try:
             r = subprocess.run(["git", "check-ignore", "-q", full], cwd=str(wiki_abs),
-                                capture_output=True, timeout=5)
+                                capture_output=True, timeout=5, env=_git_env())
             _IGN_CACHE[full] = (r.returncode == 0)
         except Exception:
             _IGN_CACHE[full] = False
     return _IGN_CACHE[full]
+_TRACKED_CACHE = {}
+
+
+def tracked(wiki: Path):  # -> set[str] | None (3.9 không có union operator)
+    """Tập path (rel theo wiki) mà git ĐANG theo dõi — kể cả mới `git add` (đọc index, không HEAD).
+
+    Lý do tồn tại: file có trên đĩa nhưng CHƯA add và KHÔNG bị ignore thì fresh clone không
+    thấy — index.md trỏ tới nó sẽ đỏ trên CI mà xanh ở máy tác giả. Đó đúng là lỗ mà docstring
+    của gitignored() nói là phải bịt: "nhất quán giữa máy tác giả và clone sạch".
+    Fail-open: git lỗi/không có → None, caller giữ nguyên hành vi cũ. RỖNG cũng coi như
+    None: sandbox `git init` mới toanh (harness/tests/*.sh copy cây rồi init, không add)
+    có 0 file tracked — ở đó "chưa add" KHÔNG đồng nghĩa "clone sạch không thấy", và áp
+    luật untracked sẽ báo THỪA toàn bộ index.
+    """
+    key = str(wiki.resolve())
+    if key not in _TRACKED_CACHE:
+        try:
+            r = subprocess.run(["git", "ls-files", "-z", "--cached", "."], cwd=key,
+                               capture_output=True, timeout=10, env=_git_env())
+            got = ({p for p in r.stdout.decode().split("\0") if p}
+                   if r.returncode == 0 else None)
+            _TRACKED_CACHE[key] = got or None
+        except Exception:
+            _TRACKED_CACHE[key] = None
+    return _TRACKED_CACHE[key]
+
+
 CONTENT_DIRS = ("concepts", "entities", "sources", "draft", "architecture", "tours")
 LINK_RE = re.compile(r"\]\(([^)#\s]+\.md)\)")
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)")
@@ -51,14 +90,18 @@ def content_files(wiki: Path) -> set[str]:
     chúng không bắt buộc index và nhất quán local ↔ fresh clone. An-toàn-mặc-định: caller (main,
     audit, indexed_files) khỏi tự lọc lại 'exist' → không tái lặp drift bỏ-quên-lọc gitignored."""
     out = set()
+    trk = tracked(wiki)
     for d in CONTENT_DIRS:
         base = wiki / d
         if not base.is_dir():
             continue
         for f in base.rglob("*.md"):
             rel = f.relative_to(wiki).as_posix()
-            if f.name not in SKIP_BASENAMES and not gitignored(rel, wiki):
-                out.add(rel)
+            if f.name in SKIP_BASENAMES or gitignored(rel, wiki) or "archive" in f.relative_to(wiki).parts:
+                continue   # archive/ = lịch sử đông cứng (tidy) — có html/archive/INDEX.md riêng, không bắt vào index.md
+            if trk is not None and rel not in trk:
+                continue   # chưa `git add` → fresh clone không có → coi như vắng mặt
+            out.add(rel)
     return out
 
 
@@ -144,7 +187,8 @@ def main() -> None:
     exist = content_files(wiki)
     indexed = indexed_files(wiki)
     missing = sorted(exist - indexed)                                   # có file (tracked), index chưa ghi
-    stale = sorted(f for f in (indexed - exist) if not gitignored(f, wiki))  # row trỏ file tracked không tồn tại
+    stale = sorted(f for f in (indexed - exist)
+                   if not gitignored(f, wiki) and not ("/archive/" in f and (wiki / f).is_file()))  # row trỏ file tracked không tồn tại; row trỏ archive/ còn file = ok
 
     if "--fix" in sys.argv[1:]:
         n = fix(wiki, missing)

@@ -22,6 +22,13 @@
 | [250626-walkthroughs](html/250626-walkthroughs.html) | index | 2026-06-25 |
 | [rule-registry](concepts/rule-registry.md) | concept | 2026-06-27 — Registry R1..R12 (1 trang) + 2 policy.yaml + R6=verify-before-commit |
 | [fdk](concepts/fdk.md) | concept | 2026-06-27 — Framework Development Kit: front-door + pre-flight + module map (không miss rule, không dẫm module cũ) |
+| [orca-graph](concepts/orca-graph.md) | concept | 2026-09-12 — phân việc dạng đồ thị phụ thuộc: runtime khoá/lease/generation/state bền + 2 file vẽ + sổ câu trả lời model có audit (bịa = 0); v2 thêm cấp chứa, cycle xuyên graph, replan, control; v3 thêm lý do cạnh + audit-edges, resource claims, lý do chờ, add-node, eval VT — engine tách sang repo Rheinmir/orca-graph, framework giữ shim |
+| [install-update-flows](concepts/install-update-flows.md) | concept | Bảng mọi đường đưa code overstack xuống một máy (cài mới · cập nhật · ca đặc biệt · cổng kiểm): mỗi ô trỏ ca test trong install-flows-test.sh hoặc ghi rõ chưa làm; ghi hai gốc đã sửa (engine đi cùng shim, cổng "engine tới nơi") và nhãn repo_role |
+| [200926-slop-baseline](sources/200926-slop-baseline.md) | source | Số đo ĐỎ trước khi sửa slop trên trang HTML framework sinh: cổng tĩnh 28 FAIL · 29 WARN trên 19 trang, cổng chạy thật 17/20 trang hỏng (chữ chìm, sọc một cạnh, thiếu toggle, icon đè chữ) — mốc để so sau khi gom về lớp nền chung |
+| [210926-slop-code-checkable](sources/210926-slop-code-checkable.md) | source | Phân loại 69 gate slop thành tĩnh · chạy thật · cần mắt (23 · 34 · 12); phân tích kẽ hở của side-stripe dẫn tới luật rounded-edge (bo tròn không thêm cạnh màu) và 6 luật code-được đã cài ở PLAN 210926 |
+| [220926-docs-shell-baseline](sources/220926-docs-shell-baseline.md) | source | Số đo ĐỎ trước khi lớp nền tự chèn khung docs-site-macos: 0/6 trang docs-shell đủ khung (mind-map 6, draggable 4, icon-tile 3…); vì sao 33 trang có nav khác bị loại khỏi phạm vi |
+| [220926-spacing-standards](sources/220926-spacing-standards.md) | source | Chuẩn khoảng cách đọc từ nguồn gốc: WCAG 1.4.12/1.4.8/2.5.8, thang IBM Carbon, Tailwind, USWDS, Baymard, Butterick; hiện trạng 92 giá trị khác nhau, 61% ngoài lưới 4px |
+| [200926-archify-renderer-fixes](sources/200926-archify-renderer-fixes.md) | source | Vá renderer ở fork Rheinmir/archify 20/09/2026: nhãn node hết chui dưới icon (sigilSafeLabelFitWidth), màu chữ đạt 4,5:1 ở cả hai chế độ mọi preset, khối nav hết dính; kèm nợ mở bảng delta |
 | [ADR-001-policy-as-source-of-truth](sources/adr/ADR-001-policy-as-source-of-truth.md) | decision | 2026-06-27 — policy.yaml nguồn chân lý, thin-adapter (case R11) |
 | [ADR-002-pull-before-change-gates](sources/adr/ADR-002-pull-before-change-gates.md) | decision | 2026-06-27 — R12 git-level+orchestrator, bỏ per-edit, đa-vendor/đa-subrepo |
 | [ADR-003-skill-as-single-source-of-truth](sources/adr/ADR-003-skill-as-single-source-of-truth.md) | decision | 2026-06-27 — skill con = SoT, orchestrator delegate; Claude nghĩ / CLI rẻ render |
@@ -33,6 +40,12 @@
 <!-- index:auto:start -->
 | [r2-origin-section](sources/evals/r2-origin-section.md) | eval | Golden: R2 origin-required |
 | [sql-active-users](sources/evals/sql-active-users.md) | eval | Golden: SQL active users |
+| [context-guard-cache-read](sources/evals/context-guard-cache-read.md) | eval | Golden: gác đầy context phải đo input + cache_read + cache_creation của lượt cuối |
+| [hook-gate-consistency](sources/evals/hook-gate-consistency.md) | eval | Golden: SessionStart thoát trước recall() khi thiếu manifest — GH#151 |
+| [r3-index-sync-gate](sources/evals/r3-index-sync-gate.md) | eval | Golden: draft quên dòng index bị chặn ở pre-commit wiki-index-sync — GH#150 |
+| [teach-me-engineer-wikieval](sources/evals/teach-me-engineer-wikieval.md) | eval | Golden: teach-me cho engineer — bảy phần đúng thứ tự, sơ đồ, bằng chứng runtime |
+| [teach-me-manager-syncskill](sources/evals/teach-me-manager-syncskill.md) | eval | Golden: teach-me cho manager — không code/backtick, nói bằng rủi ro, chốt đề xuất |
+| [teach-me-eli5-merge-conflict](sources/evals/teach-me-eli5-merge-conflict.md) | eval | Golden: teach-me ELI5 — git merge conflict cho trẻ 5 tuổi, có so sánh, không jargon |
 | [feature-catalog](concepts/feature-catalog.md) | concept | Feature Catalog — và VÌ SAO mỗi cái phải có |
 | [ADR-005-logger-and-capabilities-travel-downstream](sources/adr/ADR-005-logger-and-capabilities-travel-downstream.md) | decision | ADR-005: logger + capability-map đi xuống cùng dự án (scoped) |
 | [harness-enforcement-floor](concepts/harness-enforcement-floor.md) | concept | Harness enforcement floor — vì sao CI mới là sàn thật |
@@ -63,6 +76,7 @@
 | [ADR-016-no-ai-attribution-in-commits](sources/adr/ADR-016-no-ai-attribution-in-commits.md) | decision | ADR-016: Không ghi công AI trong commit (R15) |
 | [framework-dev-antipatterns](concepts/framework-dev-antipatterns.md) | concept | Framework-dev anti-patterns |
 | [ADR-017-global-shared-engine-repo-data-travel](sources/adr/ADR-017-global-shared-engine-repo-data-travel.md) | decision | ADR-017: Global-shared engine + repo-data travel |
+| [ADR-018-orca-graph-file-based-graph-engine](sources/adr/ADR-018-orca-graph-file-based-graph-engine.md) | source | "ADR-018: orca-graph là graph engine file-based một máy — vay luật state của Reprise, không vay hạ tầng" |
 | [010726-council-output](draft/orca/010726-council-output.md) | auto |  |
 | [adapt-modes-pick](sources/evals/adapt-modes-pick.md) | eval | Golden: adapt-modes-pick |
 | [capproof-liveness](sources/evals/capproof-liveness.md) | eval | Golden: capproof-liveness |
@@ -70,6 +84,7 @@
 | [artifact-selfpath-relative](sources/evals/artifact-selfpath-relative.md) | eval | Golden: artifact-selfpath-relative |
 | [merge-fork-identity](sources/evals/merge-fork-identity.md) | eval | Golden: merge-fork-identity |
 | [merge-superset-conflict](sources/evals/merge-superset-conflict.md) | eval | Golden: merge-superset-conflict |
+| [downstream-layout-awareness](sources/evals/downstream-layout-awareness.md) | eval | Golden đo agent sửa hook trong repo framework có biết code chạy ở đâu trên máy khách: stamp .llmwiki/.harness-stamp, engine ~/.claude/harness, resolver dùng chung, chứng minh bằng fixture layout dot |
 <!-- index:auto:end -->
 | [harness-local](concepts/harness-local.md) | concept | harness-local — harness RIÊNG của dự án |
 | [ADR-011-project-local-harness](sources/adr/ADR-011-project-local-harness.md) | source | "ADR-011: project-local harness — dự án tự phát triển rule riêng (P-namespace, sandbox-safe)" |

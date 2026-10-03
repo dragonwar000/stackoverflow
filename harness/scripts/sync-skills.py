@@ -30,12 +30,13 @@ LOOP_MAP = {
     "verify-before-commit": "dev-loop", "build-now-adapt-later": "dev-loop", "ship": "dev-loop",
     "new-skill": "dev-loop", "loop-runner": "dev-loop", "failure-flywheel": "dev-loop", "wikieval": "dev-loop",
     "skill-provenance": "dev-loop", "qc-code": "dev-loop", "teach-me": "dev-loop",
-    "doyourmagic": "dev-loop",
+    "qc-uiux": "dev-loop", "visual-qa": "dev-loop",
+    "doyourmagic": "dev-loop", "br": "dev-loop", "ui-kit-from-code": "dev-loop", "ui-snapshot": "dev-loop", "surface-coverage": "dev-loop",
     # orchestrate
     "orca-dispatch-reference": "orchestrate", "orca-onboard": "orchestrate", "orca-issue": "orchestrate",
     "orca-handover": "orchestrate",
     "wayfinder": "orchestrate",
-    "orca-sec-scans": "orchestrate", "orca-workflow": "orchestrate", "orca-eval": "orchestrate",
+    "orca-sec-scans": "orchestrate", "orca-workflow": "orchestrate", "orca-graph": "orchestrate", "tc-run": "orchestrate", "orca-eval": "orchestrate",
     "council": "orchestrate", "trace-grader": "orchestrate",
     # wiki-loop
     "ingest": "wiki-loop", "lint": "wiki-loop", "query": "wiki-loop", "wiki-room": "wiki-loop",
@@ -47,14 +48,19 @@ LOOP_MAP = {
     "caveman-help": "utils", "caveman-review": "utils", "caveman-stats": "utils",
     "extract-site": "utils", "harness-tour": "utils",
     "harness-update": "utils", "health-check": "utils", "fdk": "utils", "fdk-uat": "utils", "medic": "utils", "md-to-html": "utils",
-    "docs-curate": "utils", "raise-issue": "utils",
+    "tidy": "utils", "raise-issue": "utils",
     "frontier-scan": "utils", "ovs-notes": "utils",
     "sync-template": "utils", "uat-nonit-testcase": "utils", "cursor-animated-sites": "utils",
     # publish 260626 — skill trước LOCAL-ONLY (đẩy vào repo để không mất khi cài máy/dự án khác)
-    "orca-cli": "orchestrate", "orchestration": "orchestrate", "jenkins-agent-l3-deploy": "orchestrate",
-    "brandkit": "utils", "check-approve": "utils", "computer-use": "utils",
-    "design-taste-frontend": "utils", "design-taste-frontend-v1": "utils", "docs-site-macos": "utils",
-    "web-crawl": "utils", "web-clone": "utils", "hallmark": "utils", "prd-grade-fe": "utils", "diagram": "utils",
+    # GỠ 09/09/2026: orca-cli · orchestration · computer-use — trùng tên với skill Orca.app TỰ QUẢN.
+    "jenkins-agent-l3-deploy": "orchestrate",
+    "brandkit": "utils", "check-approve": "utils",
+    "design-taste-frontend": "utils", "design-taste-frontend-v1": "utils", "docs-site-macos": "utils", "dark-mode-maker": "utils",
+    "web-crawl": "utils", "web-clone": "utils", "hallmark": "utils", "design-prim": "utils", "prd-grade-fe": "utils", "diagram": "utils",
+    "timeline": "utils", "blur": "utils",
+    "scroll-effects": "utils", "gsap-scrolltrigger-pin": "utils", "lenis-smooth-scroll": "utils",
+    "threejs-particle-morph": "utils", "svg-stroke-reveal": "utils", "css-scroll-driven-native": "utils",
+    "mask-reveal-transition": "utils", "infinite-webgl-grid": "utils",
     "find-skills": "utils", "full-output-enforcement": "utils", "gpt-taste": "utils",
     "high-end-visual-design": "utils", "image-to-code": "utils", "imagegen-frontend-mobile": "utils",
     "imagegen-frontend-web": "utils", "industrial-brutalist-ui": "utils", "join-project": "utils",
@@ -72,7 +78,8 @@ def loop_of(name):
 def pairs():
     """(name, skills_src_path, llmwiki_target_path) cho mọi skill canonical."""
     out = []
-    for d in sorted(SKILLS.iterdir()):
+    # skills/external/<tên>/ = skill kéo từ upstream (category riêng, concept solid-what-how) — vẫn mirror
+    for d in sorted(list(SKILLS.iterdir()) + list((SKILLS / "external").glob("*/"))):
         src = d / "SKILL.md"
         if d.is_dir() and src.is_file():
             out.append((d.name, src, LLMWIKI / loop_of(d.name) / f"{d.name}.md"))

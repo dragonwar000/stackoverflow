@@ -7,11 +7,13 @@ thiếu script / mạng chậm / lỗi gì cũng exit 0, không bao giờ làm g
 """
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
-from hooklib import HARNESS_HOME, audit, project_dir, read_payload, resolve_tool
+from hooklib import HARNESS_HOME, audit, find_wiki_dir, harness_dir, overstack_dir, project_dir, read_payload, resolve_tool, stamp_path
+from hooklib import orca_graph_running as hooklib_orca_graph_running
 
 
 def find_health_check(root: Path):
@@ -32,12 +34,12 @@ def harness_integrity(root: Path) -> None:
     Chạy TRƯỚC early-exit template-manifest (downstream v4 không có manifest).
     Fail-open tuyệt đối: thiếu file / JSON hỏng → im lặng, không bao giờ gãy phiên."""
     try:
-        stamp_p = root / "llmwiki" / ".harness-stamp"
-        if not stamp_p.is_file():
+        stamp_p = stamp_path(str(root))
+        if stamp_p is None:
             return  # repo chưa bootstrap v4 → không có hợp đồng để so
         gv_p = HARNESS_HOME / "version.json"
         if not gv_p.is_file():
-            print("⚠️ [harness-integrity] repo có llmwiki/.harness-stamp nhưng GLOBAL "
+            print(f"⚠️ [harness-integrity] repo có {stamp_p.relative_to(root)} nhưng GLOBAL "
                   "~/.claude/harness CHƯA cài trên máy này — engine/validator global không chạy. "
                   "Cài: bash harness/scripts/install-harness.sh --global (hoặc re-curl bootstrap).")
             return
@@ -45,7 +47,7 @@ def harness_integrity(root: Path) -> None:
         have = str(json.loads(gv_p.read_text()).get("template_version", "0"))
         if want.split(".")[0] != have.split(".")[0]:
             print(f"🚨 [harness-integrity] LỆCH MAJOR: repo khai được gác bản v{want} "
-                  f"(llmwiki/.harness-stamp) nhưng global đang cài v{have}. Stamp là hợp đồng — "
+                  f"({stamp_p.relative_to(root)}) nhưng global đang cài v{have}. Stamp là hợp đồng — "
                   f"KHÔNG tự ép. Đồng bộ: re-curl bootstrap (cập nhật stamp) hoặc "
                   f"install-harness.sh --global (cập nhật global).")
         elif want != have:
@@ -61,24 +63,50 @@ def wiki_drift(root: Path) -> None:
     đổi kể từ neo → in 1 dòng nhắc /lint. Phục vụ dự án hiện tại (hợp ADR-004);
     tất định, 0 token, fail-open tuyệt đối."""
     try:
-        for wd in (root / "llmwiki" / "wiki", root / "wiki"):
-            anchor = wd / ".last-sync.json"
-            if not anchor.is_file():
-                continue
-            head = json.loads(anchor.read_text(encoding="utf-8")).get("gitHead", "")
-            if not head:
-                return
-            n = subprocess.run(["git", "rev-list", "--count", f"{head}..HEAD"],
-                               cwd=root, capture_output=True, text=True, timeout=4)
-            cnt = int(n.stdout.strip() or 0) if n.returncode == 0 else 0
-            if cnt:
-                print(f"⟳ [wiki-sync] code đã đổi {cnt} commit kể từ lần sync wiki "
-                      f"(neo {head[:10]}) — chạy /lint để rà; chi tiết: "
-                      f"wiki-sync.py --check.")
+        od = overstack_dir(str(root))
+        anchor = None
+        for wd in ((od / "wiki") if od else None, root / "wiki"):
+            if wd is not None and (wd / ".last-sync.json").is_file():
+                anchor = wd / ".last-sync.json"
+                break
+        if anchor is None:
             return
+        head = json.loads(anchor.read_text(encoding="utf-8")).get("gitHead", "")
+        if not head:
+            return
+        n = subprocess.run(["git", "rev-list", "--count", f"{head}..HEAD"],
+                           cwd=root, capture_output=True, text=True, timeout=4)
+        cnt = int(n.stdout.strip() or 0) if n.returncode == 0 else 0
+        if cnt:
+            print(f"⟳ [wiki-sync] code đã đổi {cnt} commit kể từ lần sync wiki "
+                  f"(neo {head[:10]}) — chạy /lint để rà; chi tiết: "
+                  f"wiki-sync.py --check.")
     except Exception:
         pass
 
+
+
+def draft_threshold(root: Path) -> None:
+    """Kho nháp phình (draft/*.md tầng gốc > ngưỡng, mặc định 10) → in 1 khối HỎI user có chạy /tidy
+    không (quét outdated → promote/ingest → cold archive). Vòng phản hồi Meadows cho docs-sprawl
+    (proposal 090926-docs-curate-threshold-gate). Hỏi 1 lần/phiên (SessionStart chạy 1 lần);
+    tất định, 0 token, fail-open; không có tidy.py (bản cũ) → im lặng."""
+    try:
+        t = resolve_tool(str(root), "harness/scripts/tidy.py")
+        if not t:
+            return
+        r = subprocess.run([sys.executable, t, "check", "--root", str(root), "--json"],
+                           cwd=root, capture_output=True, text=True, timeout=5)
+        if r.returncode != 3:
+            return
+        s = json.loads(r.stdout or "{}")
+        print(f"🧹 [tidy] draft/ có {s.get('draft_top')} file .md tầng gốc (> ngưỡng {s.get('threshold')}) — "
+              f"outdated {s.get('outdated')} · promote? {s.get('promote')} · html cũ {s.get('html_archive')}.\n"
+              f"   HỎI user (1 câu, trước khi làm việc khác): \"Chạy /tidy để quét nháp lỗi thời so với thực tế → "
+              f"promote/ingest bản chất quý vào wiki → dời .md đã xong vào cold archive?\" "
+              f"ĐỒNG Ý → gọi skill `tidy`. TỪ CHỐI → bỏ qua, KHÔNG hỏi lại trong phiên này.")
+    except Exception:
+        pass
 
 
 def output_style(root: Path) -> None:
@@ -103,6 +131,29 @@ def output_style(root: Path) -> None:
                       "trước hành động phá huỷ → xác nhận đã; và TÀI LIỆU người đọc "
                       "(ADR/proposal/README/report/HTML) vẫn theo luật văn xuôi đầy đủ của CLAUDE.md.")
                 return
+    except Exception:
+        pass
+
+
+def learned_guardrails(root: Path) -> None:
+    """Thẻ chỉ dẫn máy GÓI từ lỗi lặp >= ngưỡng (flywheel `pack_guardrail`) — user 23/09/2026:
+    "bugs hoặc failed hay error cứ hơn 2 lần thì sẽ được gói lại thành instruction dùng cho lần kế".
+    In tiêu đề + triệu chứng gần nhất; agent mở file khi làm việc cùng loại. Fail-open."""
+    try:
+        d = harness_dir(str(root)) / "metrics" / "guardrails"   # downstream là .harness/ — KHÔNG ghi cứng
+        if not d.is_dir():
+            return
+        cards = sorted((c for c in d.glob("*.md") if c.name != "INDEX.md"),
+                       key=lambda c: c.stat().st_mtime, reverse=True)[:5]
+        if not cards:
+            return
+        print("🧯 [đã học] lỗi lặp đã được gói thành chỉ dẫn — ĐỌC trước khi làm việc cùng loại:")
+        for c in cards:
+            lines = c.read_text(encoding="utf-8", errors="ignore").splitlines()
+            head = lines[0].lstrip("# ").strip()
+            sym = next((l.split("**Triệu chứng:**")[-1].strip() for l in lines if "**Triệu chứng:**" in l), "")
+            print(f"  • {head} — {sym[:110]}")
+            print(f"    {c.relative_to(root)}")
     except Exception:
         pass
 
@@ -237,13 +288,16 @@ def wikigraph_reminder(root: Path) -> None:
     try:
         if os.environ.get("OVERSTACK_WIKIGRAPH") != "1":
             return
-        wiki = root / "llmwiki" / "wiki"
+        od = overstack_dir(str(root))
+        if od is None:
+            return
+        wiki = od / "wiki"
         if not wiki.is_dir():
             return
         mds = [p for p in wiki.rglob("*.md") if p.name not in ("index.md", "log.md")]
         if not mds:
             return  # wiki rỗng → chưa có gì để vẽ (chạy orca-onboard trước)
-        graph = root / "llmwiki" / "html" / "wiki-graph.html"
+        graph = od / "html" / "wiki-graph.html"
         newest = max(p.stat().st_mtime for p in mds)
         if graph.is_file() and graph.stat().st_mtime >= newest:
             return  # vector đã vẽ & mới hơn wiki → im
@@ -252,8 +306,47 @@ def wikigraph_reminder(root: Path) -> None:
             return  # engine không tới được → gợi lệnh cũng vô ích (harness-integrity lo)
         why = "chưa vẽ" if not graph.is_file() else "cũ hơn wiki"
         print(f"🕸️ [wiki-graph] vector quan hệ {why} — vẽ ngay: "
-              f"python3 {wg} llmwiki/wiki --code-root .  "
+              f"python3 {wg} {wiki.relative_to(root)} --code-root .  "
               f"(hoặc để Stop tự vẽ khi có diff ở wiki/ hay code)")
+    except Exception:
+        pass
+
+
+def orca_graph_running(root: Path) -> None:
+    """orca-graph có node đang `locked`/`dispatched` → in đường dẫn TUYỆT ĐỐI của bảng dispatch
+    kanban ngay đầu phiên. Logic dùng chung với user_prompt_submit.py (mỗi lượt) nằm ở
+    `hooklib.orca_graph_running()` — chỗ này chỉ format print theo văn phong session_start."""
+    try:
+        running, link = hooklib_orca_graph_running(str(root))
+        if not running or not link:
+            return
+        shown = ", ".join(running[:4]) + ("…" if len(running) > 4 else "")
+        print(f"📋 [orca-graph] {len(running)} node đang chạy ({shown}) — bảng dispatch kanban:")
+        print(f"  file://{link}")
+    except Exception:
+        pass
+
+
+def downstream_map(root: Path) -> None:
+    """Chỉ ở REPO FRAMEWORK: nhắc layout đang nhìn KHÁC layout máy khách. Không phải context FDK
+    (ADR-004) — đây là orientation 7 dòng chống ảo giác đường dẫn, đo 2026-09-11 (hook câm ở dot)."""
+    try:
+        if not (root / "fdk" / "wiki").is_dir():
+            return
+        rows = []
+        for ln in (root / "harness" / "downstream-contract.yaml").read_text(encoding="utf-8").splitlines():
+            m = re.match(r'\s*-\s*\{repo:\s*"([^"]*)",\s*downstream:\s*"([^"]*)"', ln)
+            if m:
+                rows.append(f"  {m.group(1):<52} → {m.group(2)}")
+        if not rows:
+            return
+        print("🗺 [downstream-map] Đây là REPO FRAMEWORK — layout máy khách KHÁC cái bạn đang thấy:")
+        print("\n".join(rows[:6]))
+        print("  • Dự án khách KHÔNG chứa hook hay engine: hook chạy từ ~/.claude/harness/hooks "
+              "(đăng ký ở ~/.claude/settings.json, chỉ bật khi thấy .llmwiki/.harness-stamp); "
+              "trong dự án chỉ có .harness/poc-vendor-neutral (validator + CI).")
+        print("  LUẬT: code/hook/CI chạm downstream KHÔNG ghi cứng llmwiki/ · harness/ — dùng overstack_paths.* / hooklib.*;"
+              " test trong fixture dot: bash harness/tests/dot-layout-runtime-test.sh .")
     except Exception:
         pass
 
@@ -266,11 +359,20 @@ def main() -> None:
     harness_integrity(root)  # U11: so stamp↔global TRƯỚC early-exit (downstream v4 không có manifest)
     wiki_drift(root)         # code→wiki drift — cũng TRƯỚC early-exit (downstream v4 là đích chính)
     wikigraph_reminder(root) # C: cờ bật mà vector thiếu/cũ → nhắc 1 dòng (trước early-exit, downstream primary)
+    draft_threshold(root)    # kho nháp vượt ngưỡng → HỎI user chạy /tidy (trước early-exit, downstream primary)
     if not (root / ".template-manifest.json").is_file():
-        sys.exit(0)  # không phải project dùng template → bỏ qua
+        # GH#151: bản cài downstream (v4) KHÔNG có manifest nhưng CÓ wiki. UserPromptSubmit/Stop gác
+        # bằng find_wiki_dir nên vẫn ghi số đo, còn hook này thoát ở đây → recall/okf-scan không bao giờ
+        # chạy, self-report báo "N phiên có số đo, 0 biên lai". Cùng một điều kiện cho cả ba hook.
+        if find_wiki_dir(str(root)) is not None:
+            recall(root, payload.get("session_id") or "")
+        sys.exit(0)  # không phải project dùng template → bỏ qua phần còn lại
 
     output_style(root)  # đầu phiên: chốt KIỂU nói chuyện (chat), trước khi nói gì
     orient(root)  # đầu phiên: cho agent BIẾT project có gì + nhắc query trước (chống 'lơ ngơ')
+    learned_guardrails(root)  # lỗi lặp > 2 lần đã được gói thành chỉ dẫn → nạp lại cho phiên này
+    orca_graph_running(root)  # graph đang có node locked/dispatched → tự bề đường dẫn kanban, khỏi hỏi lại
+    downstream_map(root)  # chỉ ở repo framework: layout đang thấy KHÁC layout máy khách (AP-7)
     recall(root, payload.get("session_id") or "")  # đầu phiên: chuỗi phiên gần nhất (episodic) — đóng vòng ghi→đọc của mem-rank
 
     # NOTE: KHÔNG auto-bơm context framework-dev (FDK) ở đây. Phần lớn phiên là dùng

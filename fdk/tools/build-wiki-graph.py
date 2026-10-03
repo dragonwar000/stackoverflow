@@ -52,6 +52,17 @@ for _cand in (Path(__file__).resolve().parents[2] / "harness/scripts/overstack_p
 INCLUDE_UNTRACKED = False
 
 
+
+def _ovs_font(html: str) -> str:
+    """Font mặc định của mọi HTML framework sinh ra = Be Vietnam Pro, NHÚNG (nguồn duy nhất: fdk/tools/html_font.py)."""
+    import importlib.util
+    here = Path(__file__).resolve()
+    for c in (here.with_name("html_font.py"), here.parents[2] / "fdk" / "tools" / "html_font.py", Path.home() / ".claude/harness/fdk/tools/html_font.py"):
+        if c.is_file():
+            s = importlib.util.spec_from_file_location("html_font", c); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+            return m.apply(html)
+    return html
+
 def _in_git(root, path) -> bool:
     if INCLUDE_UNTRACKED or _op is None or root is None:
         return True
@@ -313,7 +324,7 @@ def build_static(primary: str, out_abs: str, nodes, edges, ledger, stale):
         rel_count[e["rel"]] = rel_count.get(e["rel"], 0) + 1
     filt_rows = "".join(
         f'<label class="lg"><input type="checkbox" class="filt" id="f-{r}">'
-        f'<span style="color:{c}">●</span> {REL_VI[r]} ({rel_count.get(r,0)})</label>' for r, c in REL_COLORS.items())
+        f'<span style="color:{c}">●</span> {REL_VI[r][:1].upper() + REL_VI[r][1:]} ({rel_count.get(r,0)})</label>' for r, c in REL_COLORS.items())   # nhãn viết hoa chữ đầu (sentence-case)
     filt_css = "\n".join(
         f'.page:has(#f-{r}:checked) path.rel-{r}{{display:inline}}' for r in REL_COLORS)
     return f"""<!DOCTYPE html><html lang="vi"><head>
@@ -327,7 +338,7 @@ def build_static(primary: str, out_abs: str, nodes, edges, ledger, stale):
 body{{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue','Roboto','Segoe UI',sans-serif;
 color:var(--ink);background:linear-gradient(180deg,#f7fbff,#eaf2fd);padding:14px}}
 .bar{{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px}}
-.bar h1{{font-size:15px;color:#1d1d1f}} .bar .hint{{font-size:11.5px;color:var(--ink2);opacity:.8}}
+.bar h1{{font-size:15px;color:#1d1d1f}} .bar .hint{{font-size:11.5px;color:var(--ink2)}}
 .lg{{display:inline-flex;gap:5px;align-items:center;font-size:11.5px;color:var(--ink2);cursor:pointer}}
 .lg input{{cursor:pointer}}
 .page{{position:relative}}
@@ -341,8 +352,8 @@ path.soft{{display:none;stroke-dasharray:5 5;opacity:.25}}   /* wikilink ẩn ch
 .nd{{position:absolute;transform:translate(-50%,-50%);padding:5px 10px;border-radius:11px;white-space:nowrap;
 font-size:12px;font-weight:600;background:rgba(255,255,255,.94);border:1px solid var(--border);
 box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 3px 12px rgba(20,40,90,.1);transition:opacity .15s;cursor:default}}
-.nd.other{{background:rgba(240,244,252,.9);opacity:.4}}   /* wiki phụ mờ sẵn */
-.nd.code{{background:rgba(30,32,40,.9);color:#cfe3fb;font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:11px;border-color:rgba(120,140,180,.4);opacity:.5}}
+.nd.other{{background:rgba(240,244,252,.9);color:var(--ink2);border-style:dashed}}   /* wiki phụ mờ sẵn */
+.nd.code{{background:rgba(30,32,40,.9);color:#cfe3fb;font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:11px;border-color:rgba(120,140,180,.4)}}
 .nd .flag{{font-size:9px;font-weight:800;border-radius:999px;padding:0 5px;margin-left:4px}}
 .nd .s{{background:rgba(255,149,0,.16);color:#f08c00}} .nd .t{{background:rgba(0,0,0,.08);color:#4a4a55}}
 /* hover bất kỳ node → mờ hết, chỉ sáng node đó + hàng xóm + dây của nó */
@@ -485,7 +496,7 @@ def build_html(primary: str, out_abs: str, nodes, edges, ledger, stale):
         rel_count[e["rel"]] = rel_count.get(e["rel"], 0) + 1
     legend = "".join(
         f'<label class="lg{" zero" if rel_count.get(r,0)==0 else ""}" data-rel="{r}">'
-        f'<input type="checkbox"><span style="color:{c}">●</span> {REL_VI[r]}'
+        f'<input type="checkbox"><span style="color:{c}">●</span> {REL_VI[r][:1].upper() + REL_VI[r][1:]}'
         f'<span class="cnt">{rel_count.get(r,0)}</span></label>'
         for r, c in REL_COLORS.items())
     wikis = sorted({n["wiki"] for n in nodes})
@@ -511,7 +522,7 @@ background:rgba(255,255,255,.6);backdrop-filter:blur(10px);border-bottom:1px sol
 font-size:13px;background:rgba(255,255,255,.85);color:var(--ink)}}
 #q:focus{{outline:none;border-color:#0a84ff;box-shadow:0 0 0 3px rgba(10,132,255,.15)}}
 .bar label{{font-size:12px;color:var(--ink2);cursor:pointer;user-select:none;display:flex;gap:4px;align-items:center}}
-.bar .sp{{flex:1}} .bar .hint{{font-size:11.5px;color:var(--ink2);opacity:.8}}
+.bar .sp{{flex:1}} .bar .hint{{font-size:11.5px;color:var(--ink2)}}
 .btn{{font-size:12px;padding:6px 12px;border-radius:9px;border:1px solid var(--border);
 background:rgba(255,255,255,.85);cursor:pointer;color:var(--ink2)}} .btn:hover{{color:#0a84ff}}
 #stage{{flex:1;position:relative;overflow:hidden;cursor:grab}} #stage.grab{{cursor:grabbing}}
@@ -558,7 +569,7 @@ background:rgba(255,255,255,.9);border:1px solid var(--border);border-radius:10p
 .legend .lg input{{margin:0;cursor:pointer}} .legend .lg:hover{{color:var(--ink)}}
 .legend .lg .cnt{{margin-left:auto;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;
 color:var(--ink2);background:rgba(30,90,170,.08);border-radius:999px;padding:0 6px;min-width:20px;text-align:center}}
-.legend .lg.zero{{opacity:.4}} .legend .lg.zero .cnt{{background:transparent}}
+.legend .lg.zero{{color:var(--ink2)}} .legend .lg.zero>span:first-of-type{{opacity:.45}} .legend .lg.zero .cnt{{background:transparent}}
 .legend .lgfoot{{margin-top:6px;padding-top:6px;border-top:1px solid rgba(30,90,170,.1)}}
 .foot{{position:absolute;right:14px;bottom:12px;z-index:6;font-size:10px;color:var(--ink2);opacity:.7}}
 .foot code{{font-family:'SF Mono',ui-monospace,Menlo,monospace}}
@@ -575,7 +586,7 @@ color:var(--ink2);background:rgba(30,90,170,.08);border-radius:999px;padding:0 6
 </div>
 <div id="stage">
   <div id="world"><svg id="edges"></svg></div>
-  <div class="legend"><b>Lọc theo quan hệ</b> <span style="opacity:.7">(tick để chỉ hiện loại đó)</span>{legend}<div class="lgfoot"><span style="color:#f08c00">S</span> stale · <span style="color:#4a4a55">T</span> tombstone · <b>sáng</b>=wiki chính, <b style="opacity:.4">mờ</b>=wiki phụ</div></div>
+  <div class="legend"><b>Lọc theo quan hệ</b> <span style="color:var(--ink2)">(tick để chỉ hiện loại đó)</span>{legend}<div class="lgfoot"><span style="color:#f08c00">S</span> stale · <span style="color:#4a4a55">T</span> tombstone · <b>sáng</b>=wiki chính, <b style="color:var(--ink2);border-bottom:1px dashed currentColor">viền đứt</b>=wiki phụ</div></div>
   <div id="detail"></div>
   <div class="foot"><code>{out_abs}</code></div>
 </div>
@@ -713,7 +724,7 @@ function refresh(){{
   // node: mờ nếu không nằm trong tiêu điểm / không dính dây nào đang hiện
   D.nodes.forEach(function(n){{if(!n._el)return;
     var dim = focus ? !s[n.id] : (active ? !lit[n.id] : !baseVisible(n));
-    n._el.classList.toggle('dim', dim);
+    n._el.classList.toggle('dim', dim); if(dim){{n._el.setAttribute('data-ovs-deemphasized','');}}else{{n._el.removeAttribute('data-ovs-deemphasized');}}
     n._el.classList.toggle('hot', !!focus && n.id===focus.id);
   }});
 }}
@@ -903,7 +914,7 @@ def main() -> None:
     out = Path(a.out).resolve() if a.out else Path("llmwiki/html").resolve() / default_name
     out.parent.mkdir(parents=True, exist_ok=True)
     render = build_static if a.static else build_html
-    out.write_text(render(ptag, str(out), nodes, edges, ledger, stale), encoding="utf-8")
+    out.write_text(_ovs_font(render(ptag, str(out), nodes, edges, ledger, stale)), encoding="utf-8")
     if a.json:                     # dump nodes/edges thô cho eval/scoring (cùng dữ liệu graph vừa vẽ)
         Path(a.json).resolve().write_text(
             json.dumps({"nodes": nodes, "edges": edges,

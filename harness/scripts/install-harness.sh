@@ -19,6 +19,9 @@
 # Nguồn file: ưu tiên bundle cạnh script; thiếu thì clone $HARNESS_REPO@$HARNESS_REF
 # (cả hai suy từ REPO_RAW nếu có — fork nào cũng cài được, xem khối 0).
 set -euo pipefail
+# Windows (Git Bash + Python native): stdout mặc định cp1252/cp437 → mọi print tiếng Việt/“→” crash UnicodeEncodeError
+# giữa chừng cài (GH#168, GH#169). Ép UTF-8 cho MỌI python con của installer; Linux/macOS vốn UTF-8 nên không đổi gì.
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 
 # ---------- Flag scan (tách --self-heal khỏi positional) ----------
 # --self-heal: sau audit, installer TỰ backfill nợ (Origin+index+OKF) trong 1 process
@@ -153,6 +156,9 @@ if [ "${1:-}" = "--global" ]; then
   # KHÔNG copy vào từng repo. code_imports.py đi cùng build-wiki-graph.py (copy nguyên thư mục).
   mkdir -p "$GH/fdk/tools" "$GH/harness/scripts" "$GH/harness/validators" "$GH/llmwiki/personas"
   cp "$SRC/fdk/tools/"*.py         "$GH/fdk/tools/"        2>/dev/null || true
+  # Tool KHÔNG-python cũng phải xuống máy khách: html-visual-gate.mjs là cổng chạy-thật (Playwright).
+  # Bỏ sót thì downstream chỉ có cổng tĩnh và không ai biết — smoke 21/09/2026 bắt đúng ca này.
+  cp "$SRC/fdk/tools/"*.mjs        "$GH/fdk/tools/"        2>/dev/null || true
   cp "$SRC/harness/scripts/"*.py   "$GH/harness/scripts/"  2>/dev/null || true
   # personas travel theo engine (archetype.py --get đọc posture; UAT canary 260718 bắt preamble rỗng)
   cp "$SRC/llmwiki/personas/"*.md  "$GH/llmwiki/personas/" 2>/dev/null || true
@@ -205,11 +211,38 @@ harness/scripts/dispatch-verify.py
   log "GLOBAL: gỡ $n tool framework_only khỏi $GH — tầng 3 chỉ chạy ở repo framework"
   log "GLOBAL-SHARED engine: fdk/tools + harness/scripts + validators + *.yaml + version.json → $GH/ (mọi project dùng chung)"
 
+  # ── orca-graph: shim vừa được copy ở trên (harness/scripts/orca-graph.py, fdk/tools/graph-{viz,atlas}.py) — ENGINE THẬT
+  # sống ở repo riêng và phải tới CÙNG CHUYẾN. Trước đây việc kéo engine chỉ nằm ở poc-vendor-neutral/install.sh, nên mọi đường
+  # KHÔNG đi qua nó — /harness-update (--self-heal), --all-subrepos, gọi thẳng script này — để lại shim không có engine:
+  # /orca-graph chết "chưa cài engine" ngay sau khi UPDATE (tái hiện 20/09/2026). Đặt ở ĐÂY = một chỗ cho mọi đường.
+  # Tôn trọng lựa chọn của user: ORCA_GRAPH_SKIP=1 (install.sh export khi user bỏ tick / --no-graph) thì không kéo.
+  # Fail-open: không mạng thì cảnh báo + in lệnh cài tay, KHÔNG làm hỏng việc cài harness.
+  ensure_orca_graph() {
+    if [ -n "${ORCA_GRAPH_SKIP:-}" ]; then log "orca-graph: bỏ qua (ORCA_GRAPH_SKIP) — /orca-graph sẽ in lệnh cài khi được gọi"; return 0; fi
+    local ogi="" tmp=""
+    if [ -n "${ORCA_GRAPH_REPO:-}" ] && [ -f "${ORCA_GRAPH_REPO}/install.sh" ]; then
+      ogi="$ORCA_GRAPH_REPO/install.sh"                     # nguồn local (test/fixture/dev) — không đụng mạng
+    else
+      tmp="$(mktemp)"
+      curl -fsSL "https://raw.githubusercontent.com/Rheinmir/orca-graph/${ORCA_GRAPH_REF:-main}/install.sh" -o "$tmp" 2>/dev/null && ogi="$tmp"
+    fi
+    if [ -n "$ogi" ] && bash "$ogi" --no-skill 2>&1 | sed 's/^/    /'; then
+      log "orca-graph: engine tới cùng chuyến với shim"
+    else
+      warn "orca-graph: KHÔNG kéo được engine (mạng?) — shim đã cài nên /orca-graph sẽ báo thiếu. Cài tay: curl -fsSL https://raw.githubusercontent.com/Rheinmir/orca-graph/main/install.sh | bash"
+    fi
+    [ -n "$tmp" ] && rm -f "$tmp"
+    return 0
+  }
+  ensure_orca_graph
+
   SETTINGS="$HOME/.claude/settings.json"
-  [ -f "$SETTINGS" ] && cp "$SETTINGS" "$SETTINGS.bak.$(date +%s)" || echo '{}' > "$SETTINGS"
-  python3 - << 'PYEOF'
-import json, os
-path = os.path.expanduser("~/.claude/settings.json")
+  mkdir -p "$HOME/.claude"                                   # GH#169 C: máy mới chưa có ~/.claude → echo '{}' > … hỏng, python ném FileNotFoundError
+  { [ -f "$SETTINGS" ] && [ -s "$SETTINGS" ]; } && cp "$SETTINGS" "$SETTINGS.bak.$(date +%s)" || echo '{}' > "$SETTINGS"
+  python3 - "$SETTINGS" << 'PYEOF'
+import json, os, sys
+# đường dẫn từ argv, KHÔNG expanduser: Python native Windows lấy ~ = USERPROFILE, có thể khác $HOME của bash đang cài (GH#169)
+path = sys.argv[1]
 cur = json.load(open(path))
 HOOKS_DIR = '$HOME/.claude/harness/hooks'
 def cmd(script):
@@ -240,6 +273,8 @@ tpl = {
                      {"matcher": None, "script": "code_graph_keeper.py"}],
     "UserPromptSubmit": {"matcher": None, "script": "user_prompt_submit.py"},
 }
+if os.name == "nt":   # Windows: hook python in tiếng Việt ra stdout cp1252 → UnicodeEncodeError (GH#169) — Claude Code truyền `env` cho hook
+    cur.setdefault("env", {}).setdefault("PYTHONUTF8", "1")
 cur.setdefault("permissions", {}).setdefault("deny", [])
 # layout dot (.llmwiki/) là mặc định của dự án downstream — thiếu biến thể này thì
 # deny-glob không phủ gì cả (GH#111).
@@ -272,7 +307,7 @@ json.dump(cur, open(path, "w"), indent=2, ensure_ascii=False)
 print("[harness] GLOBAL: settings.json merged (backup .bak.*)")
 PYEOF
 
-  python3 -c "import json; json.load(open(\"$SETTINGS\"))" || { warn "settings.json hỏng — khôi phục từ backup!"; exit 1; }
+  python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$SETTINGS" || { warn "settings.json hỏng — khôi phục từ backup!"; exit 1; }
 
   # OpenClaude dùng cùng hook protocol nhưng chỉ đọc settings scope riêng. Khi CLI có mặt,
   # đăng ký cùng harness global vào ~/.openclaude mà không đè hook user (đặc biệt Orca).
@@ -463,7 +498,7 @@ PYEOF
       [ -n "$backup" ] && cp "$backup" "$settings" 2>/dev/null || true
       return 0
     fi
-    python3 -c "import json; json.load(open(\"$settings\"))" 2>/dev/null || {
+    python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$settings" 2>/dev/null || {
       warn "OpenClaude settings.json hỏng sau merge — khôi phục backup"
       [ -n "$backup" ] && cp "$backup" "$settings" 2>/dev/null || true
     }
@@ -483,19 +518,37 @@ PYEOF
   exit 0
 fi
 
+# ---------- 0.9. Dự án downstream layout DOT (v4 global-shared) KHÔNG đi đường per-project này ----------
+# Từ v4 engine sống ở ~/.claude/harness (GLOBAL), dự án chỉ giữ .llmwiki/ + .harness-stamp. Đường per-project bên dưới là bộ cài
+# đời trước: nó mkdir `llmwiki/` TRẦN và chép ~77 script vào `harness/scripts` của dự án — đúng thứ poc-vendor-neutral/install.sh
+# đang gỡ (U10) — mà KHÔNG hề cập nhật global. Đo 20/09/2026 trên máy ở 1.3.109: chạy `. --self-heal` xong global vẫn 1.3.109,
+# engine cũ nguyên, dự án mọc thêm harness/scripts 77 file. /harness-update từng trỏ vào đây → "update" mà không update gì.
+if [ -f "$ROOT/.llmwiki/.harness-stamp" ] && [ ! -d "$ROOT/fdk/wiki" ] && [ "${OVERSTACK_LEGACY_PER_PROJECT:-0}" != 1 ]; then
+  warn "DỪNG — $ROOT là dự án downstream layout dot (.llmwiki/.harness-stamp): cập nhật đi qua BOOTSTRAP, không qua đường per-project này."
+  warn "  chạy:  curl -fsSL https://raw.githubusercontent.com/Rheinmir/setup/orca/harness/poc-vendor-neutral/bootstrap.sh | bash"
+  warn "  (nó refresh engine GLOBAL + kéo orca-graph cùng chuyến + đóng lại stamp; không chép engine vào dự án). Chưa ghi gì cả."
+  exit 5
+fi
+
 # ---------- 1. Detect mode ----------
 if [ -d "$ROOT/llmwiki" ]; then MODE="migrate"; else MODE="new"; fi
 SAME_BUNDLE=0; [ "$SRC" = "$ROOT" ] && SAME_BUNDLE=1
 log "Project: $ROOT — mode: $MODE$([ $SAME_BUNDLE = 1 ] && echo ' (project chính là bundle — merge missing từ remote)')"
 
-# ---------- 2. Khung llmwiki (mode new) ----------
-if [ "$MODE" = "new" ]; then
-  mkdir -p "$ROOT/llmwiki/wiki"/{concepts,entities,sources/adr,sources/draft,draft/orca} \
-           "$ROOT/llmwiki"/{raw,html,skills}
-  touch "$ROOT/llmwiki/raw/.gitkeep"
-  [ -f "$ROOT/llmwiki/wiki/index.md" ] || printf '# Wiki Index\n\n| File | Type | Summary |\n|------|------|---------|\n' > "$ROOT/llmwiki/wiki/index.md"
-  [ -f "$ROOT/llmwiki/wiki/log.md" ]   || printf '# Operation Log\n' > "$ROOT/llmwiki/wiki/log.md"
-fi
+# ---------- 2. Khung llmwiki (MỌI mode) ----------
+# MODE chỉ hỏi "llmwiki/ đã tồn tại chưa". Một project cần đúng MỘT thư mục con
+# có sẵn (vd bước khác tạo llmwiki/wiki/sources/draft để chứa BRD) là mọi lần
+# chạy sau đều rơi vào migrate — và khi khối này còn nằm trong `if MODE = new`,
+# thư mục còn thiếu KHÔNG BAO GIỜ được bổ sung, chạy lại bao nhiêu lần cũng vậy.
+# Đo thật 2026-09-10: rhein-farm/walleye thiếu cả inbox tài liệu lẫn skills/,
+# đúng hai thứ chỉ khối này tạo ra.
+# mkdir -p và touch đều idempotent, index/log đã có guard `[ -f ] ||`, nên chạy
+# ở migrate không đè gì của project đang có.
+mkdir -p "$ROOT/llmwiki/wiki"/{concepts,entities,sources/adr,sources/draft,draft/orca} \
+         "$ROOT/llmwiki"/{raw,html,skills}
+touch "$ROOT/llmwiki/raw/.gitkeep"
+[ -f "$ROOT/llmwiki/wiki/index.md" ] || printf '# Wiki Index\n\n| File | Type | Summary |\n|------|------|---------|\n' > "$ROOT/llmwiki/wiki/index.md"
+[ -f "$ROOT/llmwiki/wiki/log.md" ]   || printf '# Operation Log\n' > "$ROOT/llmwiki/wiki/log.md"
 
 # ---------- 3. L0 + validators + scripts + evals (vendor-neutral core) ----------
 if [ "$SAME_BUNDLE" = "0" ]; then
@@ -565,11 +618,33 @@ fi
 mkdir -p "$ROOT/llmwiki/html"
 cp "$SRC/llmwiki/html/overstack.html" "$ROOT/llmwiki/html/overstack.html" 2>/dev/null \
   || cp "${TMP_SYNC:-/nonexistent}/llmwiki/html/overstack.html" "$ROOT/llmwiki/html/overstack.html" 2>/dev/null || true
+# Trang overstack.html được DỰNG ở repo framework nên neo bằng chứng (`data-src`) trỏ vào cây thư mục
+# framework (llmwiki/… · harness/… · .github/…). Ở máy khách cây khác (dot layout) và nhiều file không
+# tồn tại → cổng tĩnh báo "sơ đồ đang nói dối về code". Dịch neo sang layout đích, neo nào vẫn không có
+# thì GỠ hẳn (giữ node, bỏ lời khai sai) — im lặng để đó là để trang nói dối.
+python3 - "$ROOT" <<'PYEOF' || true
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+page = next((p for p in (root / "llmwiki/html/overstack.html", root / ".llmwiki/html/overstack.html") if p.is_file()), None)
+if page:
+    wiki = ".llmwiki" if (root / ".llmwiki").is_dir() else "llmwiki"
+    harn = ".harness" if (root / ".harness").is_dir() else "harness"
+    def fix(m):
+        raw = m.group(1)
+        cand = raw.replace("llmwiki/", wiki + "/", 1).replace("harness/", harn + "/", 1) \
+            if raw.startswith(("llmwiki/", "harness/")) else raw
+        if (root / cand).exists():
+            return 'data-src="%s"' % cand
+        return ""
+    t = page.read_text(encoding="utf-8", errors="replace")
+    page.write_text(re.sub(r'\sdata-src="([^"]+)"', fix, t), encoding="utf-8")
+PYEOF
 printf '# runtime data — khong commit\naudit/\n' > "$ROOT/llmwiki/.claude/.gitignore"
 
 SETTINGS="$ROOT/llmwiki/.claude/settings.json"
 if [ -f "$SETTINGS" ]; then
-  cp "$SETTINGS" "$SETTINGS.bak.$(date +%s)"
+  BAK="$SETTINGS.bak.$(date +%s)"; cp "$SETTINGS" "$BAK"
   python3 - "$SETTINGS" "$SRC/llmwiki/.claude/settings.json" <<'PY'
 import json, sys
 cur = json.load(open(sys.argv[1])); tpl = json.load(open(sys.argv[2]))
@@ -589,7 +664,9 @@ for event, defs in tpl.get("hooks", {}).items():
             cur_defs.append(d)
 json.dump(cur, open(sys.argv[1], "w"), indent=2, ensure_ascii=False)
 PY
-  log "settings.json: MERGE (backup .bak.*)"
+  # GH#149 tiêu chí 3: merge không đổi gì thì bỏ backup — trước đây mỗi lần chạy lại đẻ thêm 1 .bak.
+  cmp -s "$SETTINGS" "$BAK" && rm -f "$BAK"
+  log "settings.json: MERGE$([ -f "$BAK" ] && echo ' (backup .bak.*)' || echo ' — không đổi')"
 else
   cp "$SRC/llmwiki/.claude/settings.json" "$SETTINGS"
   log "settings.json: cài mới"
@@ -599,7 +676,8 @@ fi
 # (llmwiki/.claude/settings.json chỉ tác dụng khi session mở ngay tại llmwiki/)
 ROOT_SETTINGS="$ROOT/.claude/settings.json"
 mkdir -p "$ROOT/.claude"
-[ -f "$ROOT_SETTINGS" ] && cp "$ROOT_SETTINGS" "$ROOT_SETTINGS.bak.$(date +%s)"
+ROOT_BAK="$ROOT_SETTINGS.bak.$(date +%s)"
+[ -f "$ROOT_SETTINGS" ] && cp "$ROOT_SETTINGS" "$ROOT_BAK"
 python3 - "$ROOT_SETTINGS" <<'PY'
 import json, os, sys
 path = sys.argv[1]
@@ -638,6 +716,7 @@ for event, defs in tpl["hooks"].items():
             cur_defs.append(d)
 json.dump(cur, open(path, "w"), indent=2, ensure_ascii=False)
 PY
+[ -f "$ROOT_BAK" ] && cmp -s "$ROOT_SETTINGS" "$ROOT_BAK" && rm -f "$ROOT_BAK"   # không đổi → khỏi backup
 grep -q "audit/" "$ROOT/.claude/.gitignore" 2>/dev/null || printf 'audit/\nsettings.json.bak.*\n' >> "$ROOT/.claude/.gitignore"
 log "settings.json ở ROOT: OK (session mở tại root sẽ load hooks)"
 

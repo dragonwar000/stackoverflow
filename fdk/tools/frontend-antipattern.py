@@ -29,6 +29,15 @@ không nhìn NỘI DUNG lỗi. Bắt các bẫy rẻ-tiền, tất định làm 
          hoặc số dòng vượt độ dài file → sơ đồ đang NÓI DỐI về code. Fail-closed có chủ ý:
          không khai thì không bị hỏi; đã khai thì phải đúng.
 
+  Chuyển động (PLAN 210926 t7, slop-test #10 / #27):
+  [FAIL] transition-all: `transition: all` / class `transition-all` → liệt kê đúng thuộc tính.
+  [FAIL] reduced-motion-missing: có @keyframes/animation mà thiếu @media (prefers-reduced-motion).
+  [WARN]   … cùng luật khi chỉ có `transition: transform` (nợ 20 trang lúc cắm).
+
+  Khoảng cách (PLAN 220926 t4, chuẩn fdk/wiki/sources/220926-spacing-standards.md):
+  [FAIL] spacing-off-scale: padding/margin/gap px/rem ngoài thang 2·4·8·12·16·20·24·32·40·48·64·80·96 (<2px viền mảnh được tha; >96: bội 16).
+         Nhịp chữ / độ dài dòng / proximity / tầng nhãn nav / vùng bấm cần dựng hình → html-visual-gate.mjs.
+
 Exit: 0 sạch · 1 có FAIL · 2 chỉ WARN (medic map: 1→fail, 2→warn, 0→ok). Fail-open:
 thiếu file → sạch (không chặn). Mặc định quét llmwiki/html/overstack.html; nhận path khác qua arg.
 
@@ -43,6 +52,23 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def project_root(page: Path) -> Path:
+    """Gốc dự án CHỨA trang đang soi — leo từ trang lên, mốc là .llmwiki/ · llmwiki/ · .git/.
+
+    Không dùng `parents[2]` của chính file tool: ở máy khách tool chạy từ ~/.claude/harness/fdk/tools/
+    nên parents[2] ra ~/.claude — mọi neo `data-src` đều resolve sai và cổng báo "sơ đồ nói dối" hàng
+    loạt (đo 21/09/2026 trên fixture downstream). Không thấy mốc nào thì về ROOT như cũ.
+    """
+    try:
+        page = page.resolve()
+    except OSError:
+        return ROOT
+    for anc in page.parents:
+        if (anc / ".llmwiki").is_dir() or (anc / "llmwiki").is_dir() or (anc / ".git").exists():
+            return anc
+    return ROOT
 DEFAULT = [ROOT / "llmwiki" / "html" / "overstack.html"]
 # chữ Việt có dấu (precomposed) — tín hiệu chắc: lệnh shell ASCII thuần không khớp
 VN = re.compile(
@@ -268,6 +294,273 @@ def scan_svg(html: str, rel: str) -> list:
     return out
 
 
+# ── Slop TỰ GÂY (20/09/2026) — user: "framework có cơ chế bắt slop bắt buộc nhưng chưa tự bắt nó". Ba luật dưới đây bắt đúng
+# những thứ user chỉ ra trên trang do CHÍNH generator của framework sinh: sọc viền màu một cạnh, trang không đổi được sáng/tối,
+# viết HOA mỗi chỗ một kiểu. Cùng nguyên tắc cũ: CHỈ soi CSS trong <style>/style="", không soi văn xuôi nhắc tới chúng.
+def css_rules(styles: str):
+    """(selector, declarations) của từng luật CSS. KHÔNG dùng regex `([^{}]+){…}`: trên khối dài không có ngoặc (font nhúng base64
+    ~49 KB trong @font-face) nó chạy O(n²) và treo cổng — đo 20/09/2026. Tách theo `}` là tuyến tính; luật lồng trong @media vẫn đúng
+    vì selector là phần sau dấu `{` CUỐI của đoạn."""
+    styles = re.sub(r"url\(\s*data:[^)]*\)", "url()", styles)
+    for chunk in styles.split("}"):
+        if "{" in chunk:
+            sel, decl = chunk.rsplit("{", 1)
+            yield sel.rsplit("{", 1)[-1].rsplit(";", 1)[-1], decl
+
+
+_NEUTRAL_VAR = re.compile(r"var\(\s*--[\w-]*(?:border|line|divider|hair|sep|stroke|rule|grid|muted|shadow)[\w-]*", re.I)
+_STRIPE_BORDER = re.compile(r"border-(?:left|right|inline-start)\s*:\s*(\d+(?:\.\d+)?)px\s+solid\s*([^;}]*)", re.I)
+_STRIPE_INSET = re.compile(r"box-shadow\s*:[^;}]*inset\s+-?(\d+(?:\.\d+)?)px\s+0(?:px)?\s+0(?:px)?(?:\s+0(?:px)?)?\s+([^,;}]+)", re.I)
+_PSEUDO = re.compile(r"::?(?:before|after)\b", re.I)
+_UPPER = re.compile(r"text-transform\s*:\s*uppercase", re.I)
+_UPPER_BAD_SEL = re.compile(r"(?:^|[\s,>+~])(?:h[1-4]|button)\b|\.(?:btn|button|title|heading|nav-item|menu-item|tab|card-title)\b(?![\w-]*[^{]*\.(?:eyebrow|label|kicker))", re.I)
+
+
+def _is_neutral_color(c: str) -> bool:
+    """Màu KHÔNG mang nghĩa nhấn: trong suốt, xám (r≈g≈b), hoặc biến tên kiểu border/line. Sọc xám mảnh là đường kẻ, không phải slop."""
+    c = c.strip().lower()
+    if not c or c.startswith(("transparent", "currentcolor", "inherit", "none")) or _NEUTRAL_VAR.search(c):
+        return True
+    m = re.match(r"#([0-9a-f]{3,8})\b", c)
+    if m:
+        h = m.group(1); h = "".join(ch * 2 for ch in h[:3]) if len(h) in (3, 4) else h[:6]
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    else:
+        n = re.match(r"rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)", c)
+        if not n:
+            return False                      # var(--accent), tên màu… → coi là màu nhấn
+        r, g, b = (float(x) for x in n.groups())
+    return max(r, g, b) - min(r, g, b) < 28
+
+
+# ── rounded-edge (21/09/2026, PLAN 210926 t6): "đã bo tròn thì không thêm cạnh màu". Khác side-stripe: xét SAU khi gộp khai báo theo
+# selector (cascade), hiểu border-*-color / border-inline-start / border-top, và KHÔNG miễn blockquote.
+_SIDES = ("top", "right", "bottom", "left")
+_SIDE_ALIAS = {"inline-start": "left", "inline-end": "right", "block-start": "top", "block-end": "bottom"}
+_BSTYLES = {"none", "hidden", "solid", "dashed", "dotted", "double", "groove", "ridge", "inset", "outset"}
+_BORDER_DECL = re.compile(r"(?<![\w-])border(?:-(top|right|bottom|left|inline-start|inline-end|block-start|block-end))?(?:-(width|style|color))?\s*:\s*([^;}]+)", re.I)
+_RADIUS_DECL = re.compile(r"(?<![\w-])border(?:-[a-z]+-[a-z]+)?-radius\s*:\s*([^;}]+)", re.I)
+
+
+def _px(tok: str):
+    m = re.match(r"(\d*\.?\d+)(px|rem|em)?$", tok)
+    return float(m.group(1)) * (16 if m.group(2) in ("rem", "em") else 1) if m else {"thin": 1, "medium": 3, "thick": 5}.get(tok)
+
+
+def _box4(vals):
+    vals = (vals + [None] * 4)[:4] if vals else [None] * 4
+    t, r, b, l = vals[0], vals[1] or vals[0], vals[2] or vals[0], vals[3] or vals[1] or vals[0]
+    return dict(zip(_SIDES, (t, r, b, l)))
+
+
+def _rounded_edge(decl: str):
+    """Trả về cạnh lệch (vd 'left', 'left+right') nếu khối có bo góc > 0 mà 1–3 cạnh mang viền MÀU NHẤN khác màu hoặc dày ≥ 1.5×
+    phần còn lại; None nếu sạch. `decl` là khai báo ĐÃ GỘP theo selector, đọc theo thứ tự (khai sau đè khai trước)."""
+    if not any(("var(" in v) or any(float(n) > 0 for n in re.findall(r"\d*\.?\d+", v)) for v in _RADIUS_DECL.findall(decl)):
+        return None
+    if any(re.search(r"(?<![\d.])50%|\b(?:9{3,}|\d{4,})px", v) for v in _RADIUS_DECL.findall(decl)):
+        return None                             # phần tử TRÒN (spinner tải: border-top-color nhấn trên vòng xám, avatar) — không phải thẻ có sọc (review t9 F3)
+    side = {s: {"w": 3.0, "s": "none", "c": "currentcolor"} for s in _SIDES}
+    for m in _BORDER_DECL.finditer(decl):
+        where, prop, val = (m.group(1) or "").lower(), (m.group(2) or "").lower(), m.group(3).strip().lower()
+        targets = [_SIDE_ALIAS.get(where, where)] if where else list(_SIDES)
+        toks = re.findall(r"[\w-]+\([^)]*\)|\S+", val.replace("!important", ""))
+        if prop:
+            key = prop[0]
+            per = {t: (toks[0] if toks else "") for t in targets} if where else _box4(toks)
+            for t in targets:
+                v = per[t] or ""
+                side[t][key] = (_px(v) or 0.0) if key == "w" else v
+        else:                                   # shorthand: thiếu style = none, thiếu width = medium, thiếu màu = currentcolor
+            w, st, col = 3.0, "none", []
+            for tk in toks:
+                if _px(tk) is not None and not col: w = _px(tk)
+                elif tk in _BSTYLES: st = tk
+                else: col.append(tk)
+            for t in targets:
+                side[t] = {"w": w, "s": st, "c": " ".join(col) or "currentcolor"}
+    sig = {s: (d["c"], d["w"]) if d["w"] > 0 and d["s"] not in ("none", "hidden") else None for s, d in side.items()}
+    for cand in {v for v in sig.values() if v}:
+        odd = [s for s in _SIDES if sig[s] == cand]
+        if len(odd) == 4 or _neutral_edge(cand[0]):      # 1–3 cạnh, kề hay đối diện đều tính
+            continue
+        rest = [sig[s] for s in _SIDES if s not in odd and sig[s]]
+        if all(r[0] != cand[0] for r in rest) or cand[1] >= 1.5 * max((r[1] for r in rest), default=0):
+            return "+".join(odd)
+    return None
+
+
+def _neutral_edge(c: str) -> bool:
+    """_is_neutral_color + xám viết bằng hsl(H 0% L) / oklch(L ~0 H) — riêng cho rounded-edge để KHÔNG đổi hành vi side-stripe."""
+    if "color-mix(" in c.lower():
+        return True                              # ponytail: tĩnh không tính được color-mix (đường kẻ xám pha ink) → để cổng chạy thật quyết (review t9 F5)
+    m = re.match(r"\s*(hsla?|oklch)\(\s*([\d.]+%?)[,\s]+([\d.]+%?)", c.lower())
+    if m:
+        v = float(m.group(3).rstrip("%"))
+        return v < 10 if m.group(1).startswith("hsl") else (v < 0.4 if m.group(3).endswith("%") else v < 0.02)
+    return _is_neutral_color(c)
+
+
+def scan_slop(html: str, styles: str, rel: str) -> list:
+    out = []
+    add = lambda level, rule, msg, snip: out.append({"level": level, "rule": rule, "file": rel, "msg": msg, "snippet": snip[:110]})
+    stripes = []
+    for sel, decl in css_rules(styles):
+        sel_s = " ".join(sel.split())[-70:]
+        if re.search(r"blockquote|\bhr\b|\btable\b|\bt[dh]\b", sel_s, re.I):
+            continue                          # trích dẫn / đường kẻ bảng: quy ước chữ in, không phải thẻ
+        for m in _STRIPE_BORDER.finditer(decl):
+            if float(m.group(1)) >= 3 and not _is_neutral_color(m.group(2)):
+                stripes.append(f"{sel_s}{{{m.group(0).strip()}}}")
+        for m in _STRIPE_INSET.finditer(decl):
+            if float(m.group(1)) >= 2 and not _is_neutral_color(m.group(2)):
+                stripes.append(f"{sel_s}{{…inset {m.group(1)}px…}}")
+        if _PSEUDO.search(sel) and re.search(r"(?<![\w-])width\s*:\s*[1-6]px", decl) and \
+                (re.search(r"height\s*:\s*100%", decl) or (re.search(r"(?<![\w-])top\s*:\s*0", decl) and re.search(r"bottom\s*:\s*0", decl))):
+            bg = re.search(r"background(?:-color)?\s*:\s*([^;}]+)", decl)
+            if bg and not _is_neutral_color(bg.group(1)):
+                stripes.append(f"{sel_s}{{::before/after rộng ≤6px cao 100%}}")
+    for m in re.finditer(r'style\s*=\s*"([^"]*)"', html, re.I):
+        for b in _STRIPE_BORDER.finditer(m.group(1)):
+            if float(b.group(1)) >= 3 and not _is_neutral_color(b.group(2)):
+                stripes.append(f'style="{b.group(0).strip()}"')
+    if stripes:
+        add("FAIL", "side-stripe", f"sọc viền MÀU một cạnh trên thẻ/nút/callout ({len(stripes)} chỗ) — AI-tell hàng đầu. Phân loại bằng chấm màu, nhãn, "
+            "hoặc nền nhạt toàn thẻ; viền thì đều bốn cạnh.", stripes[0])
+    merged = {}                               # cascade: gộp khai báo theo selector chuẩn hoá (kể cả luật trong @media)
+    for sel, decl in css_rules(styles):
+        for one in sel.split(","):
+            key = " ".join(one.split())
+            if key and not key.startswith("@"):
+                merged[key] = merged.get(key, "") + ";" + decl
+    edges = [f"{k[-70:]} ({e})" for k, d in merged.items() if (e := _rounded_edge(d))]
+    edges += [f'style="{m.group(1)[:70]}" ({e})' for m in re.finditer(r'style\s*=\s*"([^"]*)"', html, re.I) if (e := _rounded_edge(m.group(1)))]
+    if edges:
+        add("FAIL", "rounded-edge", f"đã bo tròn còn thêm cạnh MÀU ({len(edges)} chỗ) — góc bo làm sọc màu cong dị, lộ AI-tell. Bỏ cạnh màu "
+            "(dùng chấm màu/nhãn/nền nhạt) hoặc viền đều bốn cạnh.", edges[0])
+    # ── sáng/tối: luật repo — mọi HTML phải có toggle + nhớ lựa chọn (feedback user nhắc nhiều lần) ──
+    if len(styles) > 400:                     # trang có CSS thật (bỏ trang chuyển hướng / fixture tí hon)
+        has_dark = bool(re.search(r"\[data-theme\s*=\s*[\"']?dark|prefers-color-scheme\s*:\s*dark|\.dark\b|\[data-mode", styles, re.I))
+        follows = "data-ovs-theme-follow" in html            # trang CON nhúng trong iframe: theo theme trang mẹ, không cần nút riêng
+        has_toggle = follows or bool(re.search(r"(?:id|class|aria-label|data-[\w-]+)\s*=\s*[\"'][^\"']*(?:theme|giao diện|dark-mode|color-scheme)[^\"']*[\"']", html, re.I)
+                                     and re.search(r"localStorage|data-theme|classList", html))
+        # nút dựng bằng JS (graph-viz: `sw.className='theme-switch'`) cũng là toggle thật
+        has_toggle = has_toggle or bool(re.search(r"className\s*=\s*[\"'][^\"']*theme|setAttribute\(\s*[\"']data-theme[\"']", html) and "localStorage" in html)
+        if not has_dark:
+            add("FAIL", "no-dark-mode", "trang KHÔNG có chế độ tối (không `[data-theme=dark]`, không `prefers-color-scheme`) — luật repo: mọi HTML đổi được sáng/tối.",
+                "thêm lớp nền chung: html_base.apply(html)")
+        elif not has_toggle:
+            add("FAIL", "no-theme-toggle", "có CSS chế độ tối nhưng KHÔNG có nút đổi (chỉ theo hệ điều hành) — luật repo: phải có toggle + nhớ lựa chọn.",
+                "thêm nút toggle (html_base.apply) hoặc đánh dấu trang con: data-ovs-theme-follow")
+        # lớp nền của NHÀ (user 24/09: "dự án có harness mà UI chưa apply đúng — có sáng tối nhưng đâu phải code mẫu"): trang tự viết
+        # theme riêng (font system-ui, nút tự chế) vẫn qua hai luật trên. Trang thật phải mang lớp nền chung html_base (font nhà + token
+        # + nút gạt như design-showcase). Tha: engine vẽ có hệ thiết kế riêng đã duyệt (archify preset) và miễn trừ có khai lý do.
+        exempt = re.search(r'<meta\s+name=["\']overstack-exempt["\'][^>]*content=["\'][^"\']*house-base[^>]*data-reason=["\'][^"\']{8,}', html, re.I)
+        engine = re.search(r'<meta\s+name=["\']generator["\']\s+content=["\']archify', html, re.I)
+        if 'id="ovs-base"' not in html and not exempt and not engine:
+            add("FAIL", "no-house-base", "trang KHÔNG dùng lớp nền của nhà (thiếu `<style id=\"ovs-base\">`: font Newsreader + Be Vietnam Pro, token sáng/tối, "
+                "nút gạt chuẩn) — tự viết theme riêng thì trông khác mọi trang khác. Mẫu chuẩn: skills/hallmark/references/design-showcase.html.",
+                "html_base.apply(html) (python3 fdk/tools/html_base.py --apply <file>); miễn trừ có lý do: "
+                '<meta name="overstack-exempt" content="house-base" data-reason="...">')
+    # ── viết HOA: chỉ nhãn nhỏ được uppercase và phải kèm letter-spacing ──
+    bad_up = []
+    for sel, decl in css_rules(styles):
+        if _UPPER.search(decl):
+            if "::first-letter" in sel or ":first-letter" in sel:
+                continue  # hoa CHỮ ĐẦU (luật sentence-case, lớp nền chèn) — không phải viết HOA cả chữ
+            sel_s = " ".join(sel.split())[-60:]
+            if _UPPER_BAD_SEL.search(sel_s):
+                bad_up.append(f"{sel_s} (tiêu đề/nút/mục menu không viết HOA)")
+            elif not re.search(r"letter-spacing\s*:", decl):
+                bad_up.append(f"{sel_s} (uppercase thiếu letter-spacing)")
+    if bad_up:
+        add("WARN", "uppercase-misuse", f"viết HOA lệch quy ước ({len(bad_up)} chỗ) — chỉ NHÃN NHỎ (eyebrow, tiêu đề nhóm, tiêu đề cột) được "
+            "uppercase và bắt buộc kèm letter-spacing; tiêu đề, nút, mục menu viết thường hoa đầu câu.", bad_up[0])
+    # ── transition-all (slop-test #10, PLAN 210926 t7): animate MỌI thuộc tính → layout/màu nhảy theo, giật và tốn repaint ──
+    t_all = [m.group(0) for m in _TRANS_ALL.finditer(styles)]
+    t_all += [f'class="{m.group(1)[:60]}"' for m in re.finditer(r'class\s*=\s*["\']([^"\']*)', html, re.I) if _TW_TRANS_ALL.search(m.group(1))]
+    if t_all:
+        add("FAIL", "transition-all", f"`transition: all` ({len(t_all)} chỗ) — liệt kê đúng thuộc tính cần chuyển (background-color, opacity, transform…).",
+            t_all[0])
+    # ── reduced-motion-missing (slop-test #27): trang có chuyển động mà không tôn trọng người tắt chuyển động ở hệ điều hành ──
+    if not _REDUCED.search(styles):
+        mo = _ANIM.search(styles) or _TF_TRANS.search(styles)
+        if mo:
+            add("FAIL" if _ANIM.search(styles) else "WARN", "reduced-motion-missing", "trang có chuyển động (@keyframes / animation / transition "
+                "transform) nhưng thiếu `@media (prefers-reduced-motion: reduce)` — người bị say chuyển động không tắt được.", mo.group(0))
+    # ── spacing-off-scale (PLAN 220926 t4): padding/margin/gap phải nằm trên MỘT thang (Carbon + Tailwind) ──
+    off = _spacing_off(_page_css(html))
+    if off:
+        add("FAIL", "spacing-off-scale", f"khoảng cách NGOÀI thang ({len(off)} giá trị, {len(set(off))} khác nhau) — padding/margin/gap chỉ dùng "
+            f"<2 (viền mảnh)·2·4·8·12·16·20·24·32·40·48·64·80·96px (>96: bội 16). Tự bẻ về bậc gần nhất: `python3 fdk/tools/html-slop-fix.py {rel}` "
+            "(hoặc html_font.py --apply). Chuẩn: fdk/wiki/sources/220926-spacing-standards.md.",
+            "vd " + ", ".join(f"{v:g}px" for v in sorted(set(off))[:8]))
+    return out
+
+
+# spacing-off-scale — chép TỐI THIỂU logic của spacing-survey.py (values/on_scale/off_scale): máy khách copy phẳng fdk/tools nên không
+# import chéo tool; test_frontend_antipattern_slop so khớp hai bản trên chuỗi mẫu. Bỏ khối <style id="ovs-…"> (token của lớp nền),
+# data-URI, và giá trị em/%/vw/calc/clamp/min/max/var (phụ thuộc ngữ cảnh — cổng chạy thật đo trên px đã tính).
+_SP_SCALE = (0, 1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96)
+_SP_PROP = re.compile(r"(?<![\w-])(?:padding|margin|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?\s*:\s*([^;}]+)", re.I)   # không phân biệt hoa thường — khớp phép vá (review t8 #5)
+
+
+def _page_css(html: str) -> str:
+    css = " ".join(re.findall(r"<style\b(?![^>]*\bid=\"ovs-)[^>]*>(.*?)</style>", html, re.S | re.I))
+    return re.sub(r"url\(\s*data:[^)]*\)", "", css)
+
+
+def _spacing_off(css: str) -> list:
+    out = []
+    for v in _SP_PROP.findall(css):
+        if re.search(r"calc\(|clamp\(|min\(|max\(|var\(", v, re.I):
+            continue
+        for n, u in re.findall(r"(-?\d*\.?\d+)(px|rem)\b", v, re.I):
+            px = round(abs(float(n)) * (16 if u.lower() == "rem" else 1), 2)
+            if not (px < 2 or px in _SP_SCALE or (px > 96 and px % 16 == 0)):   # < 2px = viền/khe mảnh
+                out.append(px)
+    return out
+
+
+# t7 (21/09/2026) — ĐO TRƯỚC khi cài, trên 39 trang của --all:
+#   transition-all          1 trang (design-pattern-v3) → FAIL: regex chỉ khớp đúng `transition: all`, gần như không báo giả.
+#   reduced-motion-missing  0 trang có @keyframes/animation mà thiếu media query → FAIL cho nhánh đó;
+#                           20 trang chỉ có `transition: transform` (hover nhấc thẻ, pan/zoom của viewer orca-graph — engine ở repo
+#                           riêng) → WARN: chuyển động ngắn do người dùng tự kích, báo giả đáng kể. Sau đó (t8) html_base.py chèn media query
+#                           vào MỌI trang sinh ra → 20 → 0; nhánh WARN giờ chỉ còn bắn trên trang dựng tay / dự án khách không qua lớp nền.
+#   ponytail: nâng nhánh transform lên FAIL khi trang dự án khách cũng về 0.
+_TRANS_ALL = re.compile(r"(?<![\w-])transition(?:-property)?\s*:\s*all\b", re.I)
+_TW_TRANS_ALL = re.compile(r"(?<![\w-])transition-all(?![\w-])")
+_ANIM = re.compile(r"@keyframes\b|(?<![\w-])animation(?:-name)?\s*:\s*(?!none\b)[^;}\s]", re.I)
+_TF_TRANS = re.compile(r"(?<![\w-])transition(?:-property)?\s*:[^;}]*\btransform\b", re.I)
+_REDUCED = re.compile(r"@media[^{]*prefers-reduced-motion", re.I)
+
+
+_ARCHIFY_RE = re.compile(r"\barchify \d+\.\d+")
+
+
+def _is_archify_artifact(p: Path) -> bool:
+    """Viewer archify tự chứa: miễn như R16/R20/R22 — luật của nó nằm ở fork, không ở đây."""
+    try:
+        t = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return bool(_ARCHIFY_RE.search(t)) and "<svg" in t
+
+
+def framework_pages(root: Path) -> list:
+    """Phạm vi của `--all` = MỌI trang .html nằm trực tiếp trong llmwiki/html và llmwiki/graph, trừ artifact archify.
+
+    Trước 20/09/2026 hàm này trả một DANH SÁCH TÊN ghi cứng (11 trang). Hai lần sập cùng một kiểu: (1) bản đầu chỉ
+    soi overstack.html nên medic luôn xanh trong khi cả thư mục có 52 FAIL; (2) bản 11-tên vẫn bỏ sót mọi trang SINH
+    SAU đó (wiki-graph.html, overstack-architecture.html, 200926-slop-before-after.html…) — cổng xanh không chứng
+    minh được gì về trang mới. Quét thư mục thì trang mới tự động vào phạm vi, không ai phải nhớ thêm tên."""
+    out = []
+    for d in (root / "llmwiki" / "html", root / "llmwiki" / "graph"):
+        out += [p for p in sorted(d.glob("*.html")) if p.is_file() and not _is_archify_artifact(p)]
+    return out
+
+
 def _unesc(s: str) -> str:
     return (s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"')
              .replace("&#39;", "'").replace("&amp;", "&"))
@@ -314,11 +607,14 @@ def scan(path: Path) -> list:
                            "dùng placeholder có nhãn hoặc đổi macrostructure.",
                     "snippet": m.group(0)[:60]})
         break
+    out += scan_slop(html, styles, str(rel))
     out += scan_svg(html, str(rel))
-    out += scan_svg_evidence(html, str(rel), ROOT)
+    out += scan_svg_evidence(html, str(rel), project_root(Path(path)))
     out += scan_svg_geometry(html, str(rel))
     # [WARN] prose lọt <pre> — chữ Việt có dấu ở dòng không-comment
     for block in PRE.findall(html):
+        if re.search(r'class="[^"]*\blanguage-(?:html|css|js|javascript|json|svg)\b', block):
+            continue  # mẫu code UI (showcase): chuỗi tiếng Việt là DỮ LIỆU của mẫu, không phải lệnh shell bị lẫn câu văn
         text = _unesc(TAG.sub("", block))
         for ln in text.splitlines():
             s = ln.strip()
@@ -424,14 +720,25 @@ def self_test() -> int:
 def main() -> None:
     if "--self-test" in sys.argv:
         sys.exit(self_test())
-    args = [a for a in sys.argv[1:] if a != "--json"]
+    flags = ("--json", "--all", "--count")
+    args = [a for a in sys.argv[1:] if a not in flags]
     as_json = "--json" in sys.argv
-    targets = [Path(a) for a in args] if args else DEFAULT
+    targets = [Path(a) for a in args] if args else (framework_pages(ROOT) if "--all" in sys.argv else DEFAULT)
     findings = []
     for t in targets:
         findings += scan(t)
     fails = [f for f in findings if f["level"] == "FAIL"]
     warns = [f for f in findings if f["level"] == "WARN"]
+    if "--count" in sys.argv:                 # bảng số đếm theo luật × trang — dùng ghi baseline TRƯỚC khi sửa
+        import collections
+        def rule_of(f):
+            return f.get("rule") or re.sub(r"[^a-z]+", "-", f["msg"].split("—")[0].lower())[:28].strip("-")
+        by = collections.Counter((f["level"], rule_of(f)) for f in findings)
+        for (lvl, rule), n in sorted(by.items(), key=lambda kv: (-kv[1], kv[0])):
+            pages = sorted({Path(f["file"]).name for f in findings if (f["level"], rule_of(f)) == (lvl, rule)})
+            print(f"  {n:>4}  {lvl:<4} {rule:<30} {len(pages)} trang: {', '.join(pages[:4])}{' …' if len(pages) > 4 else ''}")
+        print(f"\n  {len(fails)} FAIL · {len(warns)} WARN trên {len([t for t in targets if t.exists()])} file")
+        sys.exit(1 if fails else (2 if warns else 0))
     if as_json:
         import json
         print(json.dumps({"fail": len(fails), "warn": len(warns), "findings": findings},

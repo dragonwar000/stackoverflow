@@ -13,6 +13,9 @@ description: >
   files and wants them rendered into a cohesive visual HTML page with sections.
   If the user says "6 file" or wants separate pages per topic, generate one HTML file per
   wiki file (index.html as overview + N topic files), NOT a single combined page.
+metadata:
+  design-standard: "solid-what-how/1"
+  contract-version: "1.0.0"
 ---
 
 # macOS Docs Site Builder
@@ -20,9 +23,120 @@ description: >
 Build a **single-file HTML documentation site** with macOS-inspired design system.
 Output is a self-contained `.html` file (no JS libraries, no build step).
 
-## Design System
 
-### Color Palette
+## WHAT
+
+### Purpose và context
+- **Purpose:** dựng một docs site HTML tự chứa (một file, hoặc index + N trang) theo design system macOS liquid-glass — sidebar kính, mind map, sơ đồ SVG động kéo-thả được, theme sáng/tối — ghi vào `llmwiki/html/`, tự host để xem trước, và chỉ báo "xong" sau khi Playwright audit PASS.
+- **Trigger (when to use):**
+  - User muốn docs site, landing page, showcase, portfolio, guide, tutorial site, feature overview hoặc product documentation — nhất là khi nói "clean", "modern", "Apple-like", "macOS style", "glass", "frosted", "animated diagrams", "single HTML file".
+  - Yêu cầu "liquid glass", "frosted glass", "translucent UI" cho trang docs/showcase.
+  - User có nhiều file markdown và muốn render thành một trang HTML trực quan có section.
+  - User nói "6 file" / muốn trang riêng cho từng chủ đề → Multi-File Mode (một HTML cho mỗi file wiki + `DDMMYY-index.html`), KHÔNG gộp một trang.
+- **Non-goals:** không tự viết lại CSS/JS theme toggle (nguồn duy nhất là skill `dark-mode-maker`); không chép SVG của sơ đồ do engine archify vẽ ra ngoài (nhúng `<iframe>`); không kéo CDN/webfont/script ngoài; không ghi file ra ngoài `llmwiki/html/`; không giữ/commit script hay ảnh chụp audit.
+
+### Mental model
+`nội dung nguồn (markdown · wiki · mô tả) → N section (#sec-{i}, accent i % 6) → Page Architecture (skip-link · nav sidebar · main · hero · mind map · section · footer) → HTML tự chứa llmwiki/html/DDMMYY-<slug>.html → Auto-Host :8765 → Playwright Audit → Output Report draft`.
+
+### Input và output contract
+| | Field | Required? | Ý nghĩa |
+|---|---|---|---|
+| In | nội dung | có | file markdown / trang wiki / mô tả chủ đề — mỗi chủ đề thành một section |
+| In | chế độ trang | không (mặc định = một file) | "6 file" / trang riêng mỗi chủ đề → Multi-File Mode |
+| In | sơ đồ archify có sẵn | không | trang viewer `*.html` do `/diagram` → archify sinh, nhúng bằng `<iframe>` |
+| In | yêu cầu prototype tương tác | không | "tạo bảng tương tác thử" → Interactive Prototype / Editable Data-Grid |
+| Out | trang HTML | có | `llmwiki/html/DDMMYY-<slug>.html` (multi-file: `DDMMYY-index.html` + `DDMMYY-<slug>.html`), 0 request ngoài |
+| Out | link xem trước | có | `http://localhost:8765/llmwiki/html/DDMMYY-<file>.html` |
+| Out | kết quả audit | có | `AUDIT PASS` từ script Playwright — "xong" nghĩa là audit PASS |
+| Out | output report | có (trừ khi 0 artifact) | `llmwiki/wiki/sources/draft/DDMMYY-<ten>.md` + dòng index + log |
+
+### Rules và capabilities
+- RULE-01 (MUST): **Self-Contained — CRITICAL:** output HTML make ZERO external requests: no font/CSS/JS CDN links, no remote images, no `@import`, no `<script src>` (hyperlink `<a href>` ra ngoài thì được).
+- RULE-02 (MUST): **Output Path — CRITICAL:** ALWAYS write HTML files to `llmwiki/html/` inside the current project root; filename MUST be prefixed with today's date `DDMMYY-`; NEVER write to the project root or any other directory.
+- RULE-03 (MUST): **Navigation — SIDEBAR ONLY** (không bao giờ dùng top bar), sidebar là kính thật và có `.nav-toggle`/`.nav-close`.
+- RULE-04 (MUST): **Mind Map mặc định — luôn vẽ một bản** collapsible, sinh từ chính tài liệu.
+- RULE-05 (MUST): **Theme Toggle sáng/tối REQUIRED, KHÔNG được ép một mode** — load skill `dark-mode-maker`, nút gạt nằm trong `<nav>`.
+- RULE-06 (MUST): **Accessibility & Document Head REQUIRED** — viewport/meta/favicon inline, focus ring `:focus-visible`, skip link + `<main id="main">`, reduced-motion toàn cục, SVG có text alternative.
+- RULE-07 (MUST): Node-Draggable cho mọi `.diagram-box`; Copy Button cho mọi `pre.code-block`; Water-Ripple cho mọi control tương tác (đều REQUIRED).
+- RULE-08 (MUST): **Auto-Host** — ALWAYS start a local HTTP server after writing the HTML file.
+- RULE-09 (MUST): **Playwright Audit REQUIRED** trước khi báo user; FAIL → sửa rồi audit lại, không giao trang đỏ.
+- RULE-10 (MUST): Thang cỡ chữ COMPACT cho màn 13″ — giảm chứ không tăng size.
+- RULE-11 (MUST): Sơ đồ archify nhúng qua `<iframe>` (khung vừa nội dung + link "Mở sơ đồ riêng ↗"), để trống `meta.visual_preset` (luật R20).
+- RULE-12 (MUST): **KHÔNG gradient-text, KHÔNG sọc viền một cạnh** — `background-clip:text` (chữ tô gradient) và `border-left/right: ≥3px solid <màu>` trên thẻ/nút/callout là hai dấu hiệu AI-generated bị cổng tĩnh chặn cứng. Nhấn chữ bằng weight hoặc màu đặc; phân loại callout bằng chấm màu, nhãn, hoặc nền nhạt toàn thẻ (viền thì đều bốn cạnh).
+- RULE-13 (MUST): **Chạy HAI CỔNG trước khi giao** — `python3 fdk/tools/frontend-antipattern.py <trang>` (tĩnh) và `NODE_PATH=$(npm root -g) node fdk/tools/html-visual-gate.mjs <trang>` (chạy thật: chữ chìm < 4,5:1, khối dính < 8px, icon đè chữ, toggle, kính ở cả hai chế độ). Cổng đỏ thì SỬA rồi chạy lại; vá máy-làm-được bằng `python3 fdk/tools/html-slop-fix.py <trang>`. Không báo xong khi còn cổng đỏ.
+- Capabilities: đọc nội dung nguồn; ghi file HTML vào thư mục output của dự án; chạy HTTP server cục bộ; điều khiển trình duyệt headless để đo DOM/console/ảnh chụp; ghi draft + index + log của wiki.
+
+### Failure boundaries
+- Không có nội dung / không rõ chủ đề nào thành section → **clarify** với user, chưa sinh trang.
+- Playwright audit FAIL (lỗi console, thiếu `.nav-toggle`/`.nav-close`, theme toggle không nằm trong `.theme-row`) → **blocked**: sửa rồi audit lại; không báo trang đã xong ở trạng thái đỏ.
+- Chưa có `@playwright/test` → cài theo `/playwright-verify` rồi mới audit; không bỏ bước audit.
+- Port 8765 đã bận → coi như server đang chạy, bỏ qua bước start (không phải lỗi).
+- Mở iframe archify qua `file://` không đo được chiều cao → **partial** chấp nhận được: khung giữ 1000px, link "Mở sơ đồ riêng ↗" là đường thay thế; muốn vừa khít thì mở qua Auto-Host.
+- Cổng tĩnh hoặc cổng chạy-thật còn đỏ → **blocked**: chạy `html-slop-fix.py` cho phần máy vá được, phần còn lại sửa tay, rồi chạy lại cả hai; không giao trang còn finding.
+- Trình duyệt không có `DecompressionStream` → Mermaid engine không render (`__bmReady` reject) — xem mục Mermaid Diagram Engine.
+
+## HOW
+
+
+### Font mặc định — NHÚNG hai họ (MUST, user chốt 20/09/2026 · đổi nội dung 21/09 · đổi TIÊU ĐỀ 22/09/2026)
+**Tiêu đề dùng Newsreader 600** (serif kiểu báo, `--font-display`, `--fw-heading:600`, `--ls-heading:-.01em`; một file tĩnh cắt tại wght 600 / opsz 24 — user chọn sau khi so sáu font trên cùng mẫu tiếng Việt). Nội dung dùng **Be Vietnam Pro**: 400, chữ đậm 600; ba file tĩnh 400/600/800, xin 500 ra 400, xin 700 ra 800 — nét thật; **chữ trong sơ đồ/graph** (`svg` · `.diagram-box` · `.mm` · `.graph`) dùng **Lexend Deca: mặc định Light, đậm = Regular** (user chốt 22/09/2026 — hai bản tĩnh chia theo dải độ đậm, `--font-chart`); `--font-mono` cho code giữ nguyên. Font được **nhúng base64 vào chính trang** (~175 KB) để mở `file://` không mạng vẫn đúng font — KHÔNG dùng `<link>` Google Fonts, KHÔNG tự dán chuỗi base64 bằng tay. Việc của bạn gồm đúng hai bước:
+1. Trong CSS của trang: `body{font-family:var(--font-text);font-weight:var(--fw-text)}`; tiêu đề và tên trang dùng `font-family:var(--font-display);font-weight:var(--fw-heading)` (đừng khai stack hệ thống riêng, đừng ghi cứng 800).
+2. **Sau khi ghi xong file**, chạy một lệnh (idempotent, in `✓ … nhúng Be Vietnam Pro`):
+```bash
+python3 fdk/tools/html_font.py --apply <trang.html> [trang-khác.html …]      # máy khách: python3 ~/.claude/harness/fdk/tools/html_font.py --apply …
+```
+Chưa chạy bước 2 = trang rơi về font hệ thống → CHƯA xong. Kiểm nhanh: `grep -c 'id="ovs-font"' <trang.html>` phải ra `1`.
+
+**Bước 2 còn tự gắn bộ khung (PLAN 220926)** cho trang có sidebar `.logo` + ≥4 neo `#…`: icon tile cho mọi `nav a` chưa có `.ic` (icon chọn theo từ khoá tên mục, số thứ tự "01 ·" vào `title`), mục active = viên nền + chấm màu, vạch tiến độ đọc, skip-link, `<main id="main">`, favicon inline, scroll spy, ripple, mind map sinh từ h2/h3 (khi trang chưa có `.mm`), JS kéo-thả cho `.diagram-box`. Nguồn: `fdk/tools/html_shell.py`; CSS/JS mind map + kéo-thả là bản NGUYÊN VĂN của skill này (`html_shell.py --sync`). Chỉ `.nav-toggle`/`.nav-close` vẫn phải dựng tay. Luật R20 chặn trang thiếu khung kèm đúng lệnh `--apply`.
+
+### Hệ khoảng cách và nhịp chữ (MUST, PLAN 220926-spacing-system — nguồn `fdk/wiki/sources/220926-spacing-standards.md`)
+- **Một thang duy nhất** cho padding/margin/gap: 2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 80 · 96 px (IBM Carbon + Tailwind), dùng token `--sp-1…--sp-11` của lớp nền. Không 5, 6, 9, 10, 13, 14px. `html_font.py --apply` tự bẻ giá trị lệch về bậc gần nhất; cổng tĩnh `spacing-off-scale` chặn trang chưa qua bước đó.
+- **Line-height:** chữ nội dung 1,55–1,6 (`--lh-body`), MỘT giá trị cho mọi đoạn/mục; tiêu đề 1,1–1,3 (`--lh-heading`). Dưới 1,5 cho đoạn nhiều dòng là lỗi (`line-height-body`).
+- **Độ dài dòng:** đoạn chữ ≤ 80 ký tự (WCAG 1.4.8), mục tiêu `max-width:var(--measure)` = 34em (Baymard; ≈ 68 ký tự thật — `70ch` cho ~89 ký tự vì `ch` là độ rộng chữ số "0", rộng hơn chữ trung bình).
+- **Proximity:** khoảng TRÊN tiêu đề ≥ 1,5 lần khoảng DƯỚI (USWDS) — tiêu đề thuộc về phần chữ phía sau. Mẫu tốt đã đo: 26px trên / 12px dưới.
+- **Phân tầng nhãn sidebar:** tên trang · nhãn nhóm · mục phải khác nhau ở ≥ 2 trong 4 thuộc tính (cỡ, đậm, màu, hoa/thường) — luật `hierarchy-flat`. Mục nav 13–14px đậm 600 màu chữ chính; nhãn nhóm chữ hoa nhỏ giãn chữ.
+- **Vùng bấm** ≥ 24×24px (WCAG 2.5.8).
+- **Thang tiêu đề to → nhỏ** (MUST): h1 > h2 > h3 > h4 (mặc định lớp font: 32 · 24 · 20 · 17px) và không nhỏ hơn chữ nội dung; **tên trang ≥ 1,2 × mục nav/tab** (sidebar: logo 18px, mục 13px) — luật `heading-scale`, `title-scale`.
+- **Viết hoa chữ đầu** (MUST) cho tiêu đề, nhãn, nút, tab, mục nav (`sentence-case`; lớp nền tự sửa khi `--apply`). Tên riêng muốn giữ chữ thường: `data-case="keep"`.
+- **Kanban một style, thẻ cố định kích thước** (MUST): mọi thẻ trên bảng cùng style và cùng rộng/cao; tiêu đề `line-clamp:2`, dòng phụ `ellipsis`, bấm thẻ mở chi tiết — luật `kanban-uniform`.
+- **Code mẫu** cho sidebar, lưới, kanban, list, motion, chart…: trang `skills/hallmark/references/design-showcase.html` (máy khách: `~/.claude/skills/hallmark/references/design-showcase.html`); lấy khối bằng `python3 fdk/tools/build-design-showcase.py --get <id>` (máy khách: `python3 ~/.claude/harness/fdk/tools/build-design-showcase.py --get <id>`; `--list` in index).
+- **Khoảng nghỉ cho mắt** (MUST): màn đầu chỉ tóm tắt, chi tiết hiện khi bấm (`<details>`, popup, nút tóm tắt); đừng đặt ngang hàng hàng chục viên/chip/nút — luật `eye-rest`. Khác chuẩn vì yêu cầu đặc biệt → `<meta name="overstack-exempt" content="…" data-reason="…">`.
+
+### Main workflow
+| Step | Type | Inputs | Action | Outputs/exit | Failure/next |
+|---|---|---|---|---|---|
+| W01 | judgment | nội dung, lời user | Chia nội dung thành N section (mỗi chủ đề/file một section); chọn một file hay Multi-File Mode (B01) | danh sách section + chế độ | thiếu nội dung → clarify |
+| W02 | judgment | danh sách section | Dựng khung theo Page Architecture: skip-link, nav sidebar (kính thật, `.nav-toggle`/`.nav-close`), `<main id="main">`, hero, mind map, `section-bg s-bg{i}`, footer | khung HTML | — |
+| W03 | deterministic | N section | Sinh CSS theo Design System + CSS Generator Pattern (`#sec-{i}`, accent `i % 6`, biến thể dark-mode cho `.tag`), scrollbar overlay, font stack hệ thống | CSS inline | — |
+| W04 | judgment | nội dung mỗi section | Vẽ sơ đồ: SVG inline node-draggable (≤~5 node, tuyến tính) hoặc Mermaid engine (≥6 node / có nhánh) (B02); nhúng artifact archify qua `<iframe>` (B03) | `.diagram-box` | — |
+| W05 | deterministic | khung + CSS | Gắn thành phần bắt buộc: mind map, copy button, water-ripple, collapse, scroll spy, theme toggle từ `dark-mode-maker`, Accessibility & Document Head | trang đủ thành phần | — |
+| W06 | effect | trang | Ghi `llmwiki/html/DDMMYY-<slug>.html` (tạo thư mục nếu chưa có) | file HTML | — |
+| W07 | effect | file HTML | Auto-Host: `npx serve -p 8765` từ project root | link `http://localhost:8765/llmwiki/html/...` | port bận → server đã chạy, đi tiếp |
+| W08 | deterministic | trang đang host | Playwright Audit bằng script `.mjs` chạy `node`: 0 lỗi console, round-trip sidebar, theme toggle trong `.theme-row`, chụp 3 trạng thái | `AUDIT PASS` | FAIL → B04 |
+| W09 | effect | kết quả | Báo user link + viết Output Report draft + index + log | draft + index + log | 0 artifact → skip report |
+
+Chi tiết từng bước (nguồn chân lý cho W01–W09): các mục Design System, Page Architecture, Mind Map, Section-Bg Pattern, Animated SVG Diagrams, Accessibility & Document Head, Output Path, Auto-Host, Playwright Audit, Multi-File Mode và Output Report bên dưới — chép nguyên văn từ bản trước migrate.
+
+### Branches
+| ID | Kind | Guard | Hành vi | Skip / failure | Rejoin |
+|---|---|---|---|---|---|
+| B01 | user_optional | user nói "6 file" / muốn trang riêng mỗi chủ đề | Multi-File Mode: `DDMMYY-index.html` (card grid) + `DDMMYY-{slug}.html` mỗi file wiki, cùng design system, nav trỏ mọi trang | không yêu cầu → một file | W06 |
+| B02 | conditional_required | sơ đồ ≥6 node HOẶC có nhánh/merge | Mermaid Diagram Engine (beautiful-mermaid nhúng gzip+base64, glassmorphism post-processing) thay cho SVG tự đặt toạ độ | ≤~5 node tuyến tính → SVG tay; thiếu `DecompressionStream` → không render | W05 |
+| B03 | conditional_required | có sơ đồ do engine archify vẽ sẵn | Nhúng `<iframe class="archify-embed">` + auto-height + link "Mở sơ đồ riêng ↗"; để trống `visual_preset` | mở `file://` → khung 1000px, dùng link mở riêng | W05 |
+| B04 | recovery | Playwright audit FAIL | Sửa đúng lỗi audit báo rồi chạy lại W08 | còn đỏ → không báo xong, tiếp tục sửa | W08 |
+| B05 | user_optional | user muốn "xem UI sẽ trông ra sao" / "tạo bảng tương tác thử" | Interactive Prototype / Editable Data-Grid (vanilla JS, vẫn Self-Contained) | không yêu cầu → skip | W06 |
+
+### Validation và stopping
+Phần kiểm bằng code: script Playwright ở W08 (console/pageerror, DOM `.nav-toggle`/`.nav-close`, round-trip `nav-collapsed`, `data-theme` đổi + control nằm trong `.theme-row`) — exit 1 là đỏ. Phần cần mắt: ảnh chụp theme sáng / tối / sidebar đóng. Dừng khi audit PASS; không có trần vòng sửa cứng trong bản gốc — nhưng không bao giờ báo "xong" khi còn đỏ. Script và ảnh audit là verify-rồi-vứt, không commit.
+
+### Examples
+- **Positive:** "làm docs site macOS cho 4 file trong `llmwiki/wiki/concepts/`" → một file `llmwiki/html/190926-overstack-concepts.html` có sidebar, mind map 4 nhánh, 4 section `#sec-0..3` (accent theo `i % 6`), server `:8765`, script Playwright in `AUDIT PASS` → báo link `http://localhost:8765/llmwiki/html/190926-overstack-concepts.html` + draft report.
+- **Boundary/failure:** trang sinh ra có nút theme là chip `position:fixed` góc phải, sidebar thiếu `.nav-close` → audit in `AUDIT FAIL: ['THIẾU .nav-toggle/.nav-close …', '… KHÔNG nằm trong .theme-row …']`, exit 1 → B04 sửa rồi audit lại; KHÔNG báo user trang đã xong.
+- **Boundary:** user nói "6 file" → B01: `DDMMYY-index.html` + 6 trang `DDMMYY-<slug>.html`, không gộp một trang.
+
+### Design System
+
+#### Color Palette
 
 Base: white glass surfaces over a soft light-blue gradient field (see Background Plane below)
 Text: `#0f0f12` / `#4a4a55`
@@ -30,7 +144,7 @@ Border: `rgba(30,90,170,.14)` (cool blue-gray — never white-on-white)
 
 Palette is LIQUID-GLASS LIGHT-BLUE + WHITE for the PATTERN (surfaces, background field, nav, hero, links). CONTENT section accents cycle Apple's secondary palette (see Palette Philosophy below) — confined to tags/h4/bullets so nhiều màu vẫn không rối. No flat-black accents, no saturated-color headings.
 
-### Background Plane (glass needs something to sample)
+#### Background Plane (glass needs something to sample)
 
 Honest naming: this design system is **pragmatic CSS glass** (transparency + backdrop blur), not true refraction. For the blur to read as material at all, the body background must NOT be a flat fill — give it a restrained monochrome gradient field:
 
@@ -63,7 +177,7 @@ body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
   mask-image:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.22))}
 ```
 
-### Liquid-Glass Surface System (opacity ladder + blur scale)
+#### Liquid-Glass Surface System (opacity ladder + blur scale)
 
 Glass is a **depth system, not a single class**. Three surface tiers, each with its own alpha + blur — never repeat one alpha everywhere:
 
@@ -80,13 +194,13 @@ Glass is a **depth system, not a single class**. Three surface tiers, each with 
 
 Tier assignment: `nav` = tier 1 · `.card` / `.diagram-box` / `.repo-card` = tier 2 · `table` / dense data zones = tier 3. Reserve the strongest glass for chrome; content density rises as material strength drops.
 
-### Palette Philosophy: blue = PATTERN, Apple secondary = CONTENT
+#### Palette Philosophy: blue = PATTERN, Apple secondary = CONTENT
 
 **Blue is the chrome/pattern color ONLY** — sidebar nav, hero gradient, links, structural accents. Modern iOS tone `#0a84ff`, never dark/navy starts. **Content sections cycle through Apple's secondary palette** (teal/indigo/green/orange/pink) — nhiều màu được, miễn không rối: accents stay confined to `.tag`, `.card h4`, and `li::before` bullets.
 
 **Headings are DARK, never saturated color**: `.section-header h2 { color: #1d1d1f }` for every section. A saturated blue heading reads dated ("nhà quê") — Apple uses near-black headlines with a colored eyebrow tag above.
 
-### Section Color Cycle (Apple secondary)
+#### Section Color Cycle (Apple secondary)
 
 ```css
 #sec-0 .tag { background: rgba(10,132,255,.10); color: #0a84ff; }   /* blue */
@@ -113,7 +227,7 @@ For each section, use the accent for:
 - `.card li::before` color (the `›` bullet)
 - ⛔ NOT for `.section-header h2` — h2 is always `#1d1d1f`
 
-### Glassmorphism Cards
+#### Glassmorphism Cards
 
 ```css
 .card {
@@ -136,7 +250,7 @@ For each section, use the accent for:
 - Glow stays faint and blue-family only — depth comes from the ladder, edges, and shadow, not atmosphere.
 - **Large chrome panes (sidebar, full-height panels) NEVER use one flat alpha** — flat white fill reads as a milky wall ("màu trơn trông chắn"). They need gradient-alpha glass + a specular sheen `::before` + a color orb directly behind them. See the Navigation section for the canonical recipe.
 
-### macOS Chrome Elements
+#### macOS Chrome Elements
 
 The **repo card** and **converter mockup** use a macOS window header:
 ```html
@@ -158,7 +272,9 @@ Rộng → cap 1052 căn giữa, thẳng hàng với chữ trong hero (1100−24
 
 ⚠️ **Body cuối của boxed element cần padding-bottom rộng hơn padding-top** (bài học 13/06/2026 — user chê "chỗ chuyển tiếp bị cắt đứt không mượt"): khối nội dung cuối (vd `.rc-body`) nối thẳng xuống section kế tiếp; nếu padding dưới = padding trên (16px) thì chữ áp sát mép box, đọc như bị cụt. Cho đáy thở thêm: `padding:16px 18px 22px` (đáy ≥ trên + 6px). Quy tắc: pane kết thúc bằng text → bottom-pad ≥ top-pad.
 
-### Navigation — SIDEBAR ONLY (không bao giờ dùng top bar)
+#### Navigation — SIDEBAR ONLY (không bao giờ dùng top bar)
+
+Máy gác (R20, hook PostToolUse): trang `*/html/*.html` có hơn 3 mục (`<section id>` hoặc `<h2>`) mà không có `<nav>` chứa ít nhất 3 link `#anchor` sẽ bị chặn, bất kể skill nào sinh trang. Trang cố ý một cột thì khai `<meta name="overstack-nav" content="none">` kèm lý do.
 
 Mọi cỡ màn hình đều dùng LEFT SIDEBAR + nút collapse. ⛔ KHÔNG có chế độ top bar — top bar nhồi link wrap chữ rất xấu trên màn hẹp. Màn hẹp (<640px): sidebar OVERLAY đè content (body giữ padding-left:0), mặc định THU GỌN, user mở bằng nút toggle:
 
@@ -180,11 +296,11 @@ nav::before{content:'';position:absolute;inset:0;pointer-events:none;
     radial-gradient(220px 160px at 18% 4%,rgba(255,255,255,.55),transparent 70%),
     linear-gradient(115deg,rgba(255,255,255,.28) 0%,transparent 28%,transparent 72%,rgba(255,255,255,.14) 100%)}
 nav>*{position:relative}
-nav .logo{margin:0 0 12px;padding:6px 10px;
+nav .logo{margin:0 0 12px;padding:8px 12px;
   background:linear-gradient(135deg,#0a84ff,#64b5f7);-webkit-background-clip:text;background-clip:text;color:transparent}
 nav a{padding:8px 12px;border-radius:10px;font-size:13px;position:relative;overflow:hidden}
 nav a.active{color:#0a84ff;background:rgba(10,132,255,.08);font-weight:600}
-body{padding-left:200px}
+body{padding-left:192px}
 @media(max-width:640px){
   body{padding-left:0}                       /* sidebar overlay, không chiếm column */
   nav{box-shadow:0 8px 30px rgba(0,0,0,.14)} /* nổi trên content khi mở */
@@ -276,7 +392,7 @@ box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 0 0 1px rgba(30,90,170,.08),0 2
 ```
 Quy tắc: viền trắng đặc CHỈ hợp khi pane có content tối/đa sắc phía sau để blur sample (vd sidebar đè lên section). Chip nổi trên nền sáng → mép bằng shadow lạnh, không bằng stroke trắng.
 
-## Scrollbar — overlay tự ẩn (theme thay scrollbar mặc định)
+### Scrollbar — overlay tự ẩn (theme thay scrollbar mặc định)
 
 Thay scrollbar mặc định của trình duyệt bằng overlay **ẩn HOÀN TOÀN — track/nền/corner/button đều trong suốt, KHÔNG còn dải gutter**. Chỉ **viên pill (thumb)** fade-in (alpha 0 → tint xanh) và trượt theo nội dung khi **đang cuộn** hoặc khi **rê chuột vào dải scrollbar** (hover thumb). Áp dụng cho cả viewport lẫn sidebar (`nav` có `overflow-y:auto`). Thumb dùng `background-clip:content-box` + `border:3px solid transparent` để pill mảnh, bo tròn, nổi giữa gutter. JS thêm class `.scrolling` khi cuộn rồi gỡ sau ~900ms idle:
 
@@ -317,7 +433,7 @@ html.scrolling{scrollbar-color:rgba(10,132,255,.32) transparent}
 
 Lưu ý: tint xanh `#0a84ff` để khớp pattern; thumb đậm dần theo hover→active. Firefox không ẩn hẳn được (reserve width), nên fallback là thanh `thin` đổi màu — chấp nhận được.
 
-## Page Architecture
+### Page Architecture
 
 ```
 <a class="skip-link"> — first focusable, jumps to #main (see Accessibility section)
@@ -336,7 +452,7 @@ Lưu ý: tint xanh `#0a84ff` để khớp pattern; thumb đậm dần theo hover
 <footer>
 ```
 
-## Mind Map (MẶC ĐỊNH — luôn vẽ một bản)
+### Mind Map (MẶC ĐỊNH — luôn vẽ một bản)
 
 Mọi docs site PHẢI kèm **một mind map collapsible kiểu NotebookLM** tóm tắt cấu trúc trang (các section / thực thể / mục chính) — đặt ngay sau hero hoặc trong section "Tổng quan". Đặc trưng: **đường nối CONG (bezier) màu theo nhánh** + node chip glass + chevron; **mặc định ĐÓNG, click mở/đóng**. Self-contained (CSS + JS thuần vẽ SVG, KHÔNG thư viện). Nội dung **sinh từ chính tài liệu** (mỗi section = một nhánh, mục con = lá), cắt mô tả lá ≤~54 ký tự cho gọn. **Nhánh quá dài (>~8 lá đã là vấn đề) → KHÔNG để phẳng, chia tiếp thành nhánh con theo CHỨC NĂNG** (root → nhánh → nhóm → lá): mỗi nhóm là node `.cat has-children` lồng trong, mang class màu `.g0..g5` riêng (JS `colorOf` trả đúng màu cho đường cong); cố giữ mỗi nhóm ≤~8 lá. Ví dụ overstack chia CẢ `dev-loop` (12 → sửa-code / dựng-onboard / eval), `orchestrate` (10 → điều-phối / đánh-giá / vận-hành), `utils` (37 → 6 nhóm) — xem `fdk/tools/build-overstack-docs.py` (`LOOP_GROUPS`).
 
@@ -357,22 +473,26 @@ Mọi docs site PHẢI kèm **một mind map collapsible kiểu NotebookLM** tó
 
 **CSS** (trong `<style>`; `--ink2`/`--border` từ design system; `.b-0..b-4` cycle Apple secondary cho `.nm`+`.ct`+border — JS dùng CÙNG màu cho đường cong):
 ```css
-.mm{overflow-x:auto;padding:14px 4px 6px}
+.mm{overflow-x:auto;padding:16px 4px 8px}
 .mm-canvas{position:relative;width:max-content}
 .mm-links{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:0}
 .mm-links path{fill:none;stroke-width:2.2;opacity:.55;stroke-linecap:round}
 .mm .tree{position:relative;z-index:1}
-.mm .tree,.mm .children{display:flex;flex-direction:column;gap:9px;justify-content:center}
+.mm .tree,.mm .children{display:flex;flex-direction:column;gap:8px;justify-content:center}
 .mm .row{display:flex;align-items:center;gap:48px;position:relative}
 .mm .children{position:relative}.mm .children.collapsed{display:none}
-.mm .node{position:relative;display:inline-flex;flex-direction:column;gap:1px;padding:7px 13px;border-radius:13px;cursor:default;white-space:nowrap;background:rgba(255,255,255,.72);backdrop-filter:blur(7px) saturate(1.1);border:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 3px 14px rgba(20,40,90,.07);transition:transform .12s}
+.mm .node{position:relative;display:inline-flex;flex-direction:column;gap:1px;padding:8px 12px;border-radius:13px;cursor:default;white-space:nowrap;background:rgba(255,255,255,.72);backdrop-filter:blur(7px) saturate(1.1);border:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 3px 14px rgba(20,40,90,.07);transition:transform .12s}
 .mm .node.has-children{cursor:pointer}.mm .node:hover{transform:translateY(-1px)}
 .mm .node .nm{font-size:13px;font-weight:700;letter-spacing:-.01em}.mm .node .ds{font-size:10.5px;color:var(--ink2)}
-.mm .node .ct{font-size:10px;color:#fff;font-weight:700;padding:1px 7px;border-radius:999px;position:absolute;top:-8px;right:-8px;background:#0a84ff}
+.mm .node .ct{font-size:10px;color:#fff;font-weight:700;padding:1px 8px;border-radius:999px;position:absolute;top:-8px;right:-8px;background:#0058d0}
 .mm .node.has-children::after{content:'';position:absolute;right:-7px;top:50%;width:6px;height:6px;border-right:2px solid var(--ink2);border-bottom:2px solid var(--ink2);transform:translateY(-50%) rotate(-45deg);opacity:.5}
 .mm .node.collapsed-parent::after{transform:translateY(-50%) rotate(45deg)}
 .mm .node.root{background:linear-gradient(135deg,rgba(10,132,255,.16),rgba(88,86,214,.14));border-color:rgba(10,132,255,.4)}
+html[data-theme=dark] .mm .node{background:rgba(30,42,64,.72);border-color:rgba(120,160,220,.28);box-shadow:none}
+html[data-theme=dark] .mm .node .nm{color:#e6e9f0}
+@media (prefers-color-scheme:dark){html:not([data-theme=light]) .mm .node{background:rgba(30,42,64,.72);border-color:rgba(120,160,220,.28);box-shadow:none}html:not([data-theme=light]) .mm .node .nm{color:#e6e9f0}}
 ```
+Đo Playwright 22/09/2026: bản cũ `.ct` trắng trên `#0a84ff` = 3,67:1 ở 10px và node KHÔNG có biến thể tối (chữ 1,56:1 trên nền tối) → nay `#0058d0` + khối tối ở trên.
 (KHÔNG còn connector thẳng `.row::before`/`.children::before` — đường nối do JS vẽ bezier vào `<svg class="mm-links">`.)
 
 **JS** (vẽ bezier màu theo nhánh + mặc định ĐÓNG nhánh `.cat` + click toggle + redraw — trong `<script>`):
@@ -385,7 +505,7 @@ draw();addEventListener('load',function(){setTimeout(draw,60);});addEventListene
 ```
 Root (`.has-children` không `.cat`) mở sẵn → nhánh hiện; nhánh `.cat` đóng → click xổ lá; đường cong tự vẽ lại mỗi lần toggle/resize. `colorOf` trả CÙNG màu với class `.b-N`. Bản chạy thật: `llmwiki/html/overstack.html` tab "Tham chiếu".
 
-## Section-Bg Pattern
+### Section-Bg Pattern
 
 Each `<section>` gets two classes: `section-bg s-bgN` (N = section index mod 6).
 The gradient overlay is a `::before` pseudo-element:
@@ -399,9 +519,9 @@ The gradient overlay is a `::before` pseudo-element:
 /* Generate one .s-bgN::before per section index, cycling through 6 colors */
 ```
 
-Section padding: `padding: 64px 24px 72px; max-width: 1100px; margin: 0 auto;`
+Section padding: `padding: 64px 24px 80px; max-width: 1100px; margin: 0 auto;`
 
-### CSS Generator Pattern
+#### CSS Generator Pattern
 
 Generate the per-section CSS dynamically. For N sections, generate N rule sets using `#sec-{i}` IDs:
 
@@ -416,13 +536,26 @@ For i in 0..N-1:
   #sec-{i} .card li::before { color: accent; }
   #sec-{i} .section-header h2 { color: dark; }
   .s-bg{i}::before { background: linear-gradient(180deg, gradient 0%, transparent 60%); }
+```
+
+⚠️ **`.tag` PHẢI có biến thể dark-mode riêng (bug thật 160926, không phải giả thuyết) — VÀ phải đổi cả màu CHỮ, không chỉ nền.** `.tag{background:accent tại 12%;color:accent}` đủ tương phản trên nền sáng, nhưng CÙNG công thức đó trên nền gần-đen (`#0c0f16`) ra pill gần vô hình + chữ mờ (đo bằng Playwright thật — `getComputedStyle` + tính contrast ratio WCAG, không phải chỉ nhìn ảnh chụp). Hai vòng sửa sai đã đo được, đừng lặp lại:
+- **Sai lần 1:** chỉ nâng alpha nền (`.22`) + viền, GIỮ NGUYÊN `color:accent` cho chữ → contrast đo được **1.0–1.4:1** (mù chữ thật sự, screenshot trông "có vẻ ổn" vì mắt bắt được viền pill, không bắt được chữ mờ).
+- **Sai lần 2:** nâng alpha nền lên `.26` + đổi chữ sang trắng → PASS với accent tối (blue/indigo/pink) nhưng vẫn **FAIL 2.0–2.3:1** với accent sáng (teal/green/orange) — nền tint càng đậm càng "ăn" mất chỗ tương phản cho chữ trắng, đặc biệt với accent có kênh G/R cao.
+- **Đúng:** GIỮ nền mỏng/tối (alpha `.12`, gần bằng nền trang thật), viền đậm hơn (`.55`) để định hình cái pill, chữ **trắng trung tính** (`#f2f4f8`, không phải màu accent) đứng trên nền THẬT SỰ tối — không phụ thuộc kênh màu của accent nào. Đo Playwright xác nhận **11–16:1** trên cả 6 accent:
+```css
+@media (prefers-color-scheme: dark){
+  html:not([data-theme=light]) #sec-{i} .tag{background:accent tại 12%;border:1px solid accent tại 55%;color:#f2f4f8}
+}
+html[data-theme=dark] #sec-{i} .tag{background:accent tại 12%;border:1px solid accent tại 55%;color:#f2f4f8}
+```
+`.card h4`/`li::before` không cần đổi (chữ trên nền tối ở đó vẫn đủ tương phản — đã đo, không phải giả định). Sinh trang bằng script? Giữ đúng nguyên tắc "một nguồn emit 2 khối" như `_theme_css()` — xem `accent_css()` trong `fdk/tools/build-overstack-docs.py`.
 
 
-## Animated SVG Diagrams
+### Animated SVG Diagrams
 
 Each diagram is an inline SVG (not external file) with `viewBox` for responsiveness.
 
-### Key Animations (reusable CSS in `<defs><style>`)
+#### Key Animations (reusable CSS in `<defs><style>`)
 
 ```css
 @keyframes flowArrow { 0% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 0; } }
@@ -438,7 +571,7 @@ Each diagram is an inline SVG (not external file) with `viewBox` for responsiven
 
 Apply to SVG elements: `.flow` (dashed arrows), `.pulse` (nodes), `.float` (output badges), `.glow` (phone icon), `.drone` (bouncing), `.blink` (drone light), `.orbit-ring` (spinning product), `.cameraFlash` (strobe), `.scan` (scan line), `.stackAnim` (DICOM slices), `.center-pulse` (orbit core).
 
-### SVG Box Styling
+#### SVG Box Styling
 
 - **Nodes**: `rx="6"` or `rx="8"` rounded rects with `fill="rgba(255,255,255,.7)"` and colored stroke
 - **Arrows**: `<line>` with `marker-end="url(#arrowN)"` using `<marker>` def, `stroke-width="2"`, and `.flow` class
@@ -446,7 +579,7 @@ Apply to SVG elements: `.flow` (dashed arrows), `.pulse` (nodes), `.float` (outp
 - Use `font-family` from the page (`var(--font-text)` — macOS-first stack, see Font section)
 - Always include `xmlns="http://www.w3.org/2000/svg"` on `<svg>`
 
-### Node-Draggable Diagrams (REQUIRED for every `.diagram-box`)
+#### Node-Draggable Diagrams (REQUIRED for every `.diagram-box`)
 
 Every `.diagram-box` MUST be an interactive node graph, NOT a static or merely-pannable picture:
 
@@ -475,11 +608,11 @@ CSS — replace the old static `.diagram-box` rule with:
 .dnode:hover>rect:first-of-type{filter:drop-shadow(0 3px 8px rgba(0,0,0,.18))}
 .diagram-hint{position:absolute;top:8px;right:12px;z-index:5;font-size:10px;color:#4a4a55;
   background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.05);border-radius:20px;
-  padding:3px 10px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+  padding:4px 12px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
 .diagram-box:hover .diagram-hint{opacity:.9}
 .diagram-reset{position:absolute;bottom:8px;right:10px;z-index:5;font-size:11px;
   background:rgba(255,255,255,.85);border:1px solid rgba(0,0,0,.08);border-radius:8px;
-  padding:3px 9px;cursor:pointer;color:#4a4a55;opacity:0;transition:opacity .2s}
+  padding:4px 8px;cursor:pointer;color:#4a4a55;opacity:0;transition:opacity .2s}
 .diagram-box:hover .diagram-reset{opacity:1}
 .diagram-reset:hover{background:#fff;color:#0f0f12}
 /* resize grip kiểu macOS: 3 vạch chéo trong tam giác góc — ẨN mặc định, hover mới hiện.
@@ -587,7 +720,7 @@ Notes:
 - **Auto-fit**: on drag release the SVG `viewBox` grows to contain dragged nodes, so the svg height (and the box) sizes WITH the content — nodes never get clipped after release. `svg{overflow:visible}` keeps a node visible mid-drag too. `fitViewBox()` runs on pointerup + reset.
 - Idempotent (`dataset.draggable` guard); `resize:vertical` lets the user grow the container; flex viewport fills new height.
 
-### Mermaid Diagram Engine (auto-layout, for complex diagrams)
+#### Mermaid Diagram Engine (auto-layout, for complex diagrams)
 
 The hand-authored path above works because the LLM hand-picks every node's `x`/`y` — fine for small diagrams (≤~5 nodes, mostly linear), but coordinates get uneven once a diagram has real branching, because there is no layout algorithm behind it, only judgment. **Use this Mermaid path instead when a diagram has ≥6 nodes OR has branches/merges** — anything a real auto-layout engine earns its cost on. Below that threshold, stay on the hand-SVG path (ladder: YAGNI — don't pull in a 1.5MB engine for a 3-box flow).
 
@@ -778,7 +911,7 @@ function initMermaidNodeDrag(svg){
 
 Verified end-to-end (Playwright/Chromium, not screenshots alone): 9-node branching diagram renders with correct ELK.js layout; per-node drag moves only that node and the bound edge's nearest endpoint follows it exactly (measured transform delta == mouse delta), sibling nodes stay at `transform:null`; background drag leaves the SVG's `transform` unchanged; wheel-zoom still works; theme toggle live-recolors the diagram via the CSS custom properties with no re-render.
 
-### Copy Button on Code Panels (REQUIRED for every `pre.code-block`)
+#### Copy Button on Code Panels (REQUIRED for every `pre.code-block`)
 
 Every code panel MUST have a hover-revealed Copy button. Capture `textContent` BEFORE injecting the button (so the button label isn't copied), wrap the `<pre>` in a relative `.code-wrap`, and copy via the Clipboard API with an `execCommand` fallback.
 
@@ -818,7 +951,7 @@ function initCodeCopy() {
 initCodeCopy();
 ```
 
-### Water-Ripple Click Effect (REQUIRED on every interactive control)
+#### Water-Ripple Click Effect (REQUIRED on every interactive control)
 
 Every clickable control (any `<button>`, `.nav-link`, `.collapse-toggle`, `.code-copy`, `.diagram-reset`, checklist labels) gets a liquid-glass water ripple on pointer-down: a soft white splash with a faint blue tint that expands from the click point like a water ring and fades. One global listener — no per-button wiring.
 
@@ -855,7 +988,7 @@ Notes:
 - Opt out with `data-no-ripple` on controls where clipping would break layout (e.g. the diagram viewport itself — pan/drag should not splash).
 - Keep the tint blue-family (`rgba(10,132,255,…)`) per the palette; on dark surfaces (code panels) the white core carries the effect.
 
-## Collapse / Xem thêm
+### Collapse / Xem thêm
 
 Animated expand/collapse section:
 
@@ -895,7 +1028,7 @@ addEventListener('resize', () => document.querySelectorAll('.collapse-body.open'
   .forEach(b => { b.style.maxHeight = b.scrollHeight + 'px'; }));
 ```
 
-## Master-Detail Click-Reveal (list trái → chi tiết phải, trong 1 trang cuộn)
+### Master-Detail Click-Reveal (list trái → chi tiết phải, trong 1 trang cuộn)
 
 Khi một section có một DANH SÁCH mục mà mỗi mục có nội dung chi tiết dài (tour steps,
 endpoints, modules, rule list…), KHÔNG đổ hết chi tiết ra hoặc tách thành trang/tab riêng.
@@ -907,8 +1040,8 @@ liền mạch). Đây là cách cho "đọc tuần tự + bấm để đào sâu
 <div class="md-wrap"><ul class="md-list" role="listbox"></ul><div class="card md-detail"></div></div>
 ```
 ```css
-.md-wrap{display:grid;grid-template-columns:268px 1fr;gap:18px}
-.md-list li{padding:11px 13px;border-radius:13px;cursor:pointer;margin-bottom:8px;background:var(--glass-2);
+.md-wrap{display:grid;grid-template-columns:268px 1fr;gap:20px}
+.md-list li{padding:12px 12px;border-radius:13px;cursor:pointer;margin-bottom:8px;background:var(--glass-2);
   backdrop-filter:blur(var(--blur-2));border:1px solid var(--border);box-shadow:var(--edge-hi);transition:.16s}
 .md-list li:hover{transform:translateX(3px)}
 .md-list li[aria-selected=true]{background:linear-gradient(120deg,rgba(255,255,255,.92),rgba(244,242,255,.85));border-color:#cdc4ff}
@@ -918,7 +1051,7 @@ liền mạch). Đây là cách cho "đọc tuần tự + bấm để đào sâu
 - Ripple: chỉ gắn ở list-control nếu muốn — KHÔNG để splash lan sang panel chi tiết.
 - Bản chạy thật: skill `orca-onboard` tab "Guided Tour" (skeleton v2).
 
-## Sidebar Icon Tiles (macOS SF-Symbols-style)
+### Sidebar Icon Tiles (macOS SF-Symbols-style)
 
 Mỗi mục `nav a` = **tile bo góc đổ màu** (kiểu macOS System Settings) chứa **icon line vẽ
 bằng inline SVG** (stroke trắng, ~14px, round caps). ⛔ KHÔNG dùng glyph unicode (◫ ▸ ▤ —
@@ -933,7 +1066,7 @@ nav a .ic svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:2;stroke
 Map gợi ý: overview→`info.circle` · architecture→`square.stack.3d` · guided-tour→`mappin.and.ellipse`
 · modules→`cube.box` · run/docker→`terminal`. Bản chạy thật: `orca-onboard` skeleton v2.
 
-## Responsive
+### Responsive
 
 ```css
 @media (max-width: 700px) {
@@ -941,7 +1074,7 @@ Map gợi ý: overview→`info.circle` · architecture→`square.stack.3d` · gu
 }
 ```
 
-## Scroll Spy
+### Scroll Spy
 
 ```js
 const observer = new IntersectionObserver(entries => {
@@ -954,14 +1087,14 @@ const observer = new IntersectionObserver(entries => {
 sections.forEach(s => observer.observe(s));
 ```
 
-## Font
+### Font
 
 System fonts ONLY — NO Google Fonts `<link>`, no `@import`, no webfont download. Ưu tiên bộ font macOS (San Francisco); máy không có SF thì rơi xuống Roboto / Segoe UI — các fallback đều phải thanh lịch, không để rơi về Arial/Times:
 
 ```css
 :root{
-  --font-text: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Roboto', 'Segoe UI', sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', 'Roboto', 'Segoe UI', sans-serif;
+  --font-text: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;  /* font mặc định của overstack: Be Vietnam Pro 400 — file font được NHÚNG ở bước cuối, xem 'Font mặc định' */
+  --font-display: var(--font-text);  /* tiêu đề cùng họ Be Vietnam Pro; đậm nhạt chỉ dùng 400 / 600 / 800 (weight đã nhúng) */
   --font-mono: 'SF Mono', ui-monospace, 'SFMono-Regular', Menlo, 'Roboto Mono', Consolas, monospace;
 }
 body{font-family:var(--font-text)}
@@ -973,57 +1106,13 @@ pre.code-block,.foot-tree{font-family:var(--font-mono)}
 - Roboto/Segoe UI là fallback hệ (Android/Linux/Windows có sẵn) — KHÔNG tải webfont để giữ self-contained.
 - Mono luôn đi qua `ui-monospace` trước Menlo để bắt SF Mono trên macOS mới.
 
-## Theme Toggle sáng/tối (REQUIRED — feedback user 2026-07-06, KHÔNG được ép một mode)
+### Theme Toggle sáng/tối (REQUIRED — feedback user 2026-07-06, KHÔNG được ép một mode)
 
-**Liên quan §Navigation (trên, dòng ~161):** `.theme-row` bên dưới là con trực tiếp của `nav` đã dựng ở đó, và đọc lại biến `--nav-pad-y` khai cùng chỗ — không lặp lại CSS `nav` ở đây.
+**Tách ra thành skill riêng `dark-mode-maker` (feedback 160926: "bê nguyên cái làm hiệu ứng dark/light mode thành 1 skill riêng").** Mọi trang sinh ra phải cho user TỰ CHỌN sáng/tối bằng nút gạt (switch) dính đáy sidebar/nav — `prefers-color-scheme` chỉ là mặc định ban đầu. **Load skill `dark-mode-maker` (Skill tool) để lấy đúng:** markup nút gạt + chống FOUC + palette dark-mode trung tính (không navy-tinted) + hiệu ứng circle-reveal tỏa từ con trỏ (kẹp trong biên nút) + crest-glow liquid-glass + nghiệm thu Playwright. Đừng chép lại CSS/JS ở đây — một nguồn, sửa một chỗ, tránh đúng con drift đã từng xảy ra giữa `SKILL.md` và `fdk/tools/build-overstack-docs.py`.
 
-Mọi trang sinh ra phải cho user TỰ CHỌN sáng/tối bằng một nút toggle — `prefers-color-scheme` chỉ là **mặc định ban đầu**, không phải quyết định cuối. Ép cứng dark (hoặc light) là vi phạm. Ba mảnh bắt buộc, không mảnh nào được thiếu:
+Sinh trang bằng script (`fdk/tools/build-overstack-docs.py`)? Vẫn giữ nguyên tắc "một nguồn emit 2 khối CSS" (`_theme_css()`/`_DARK_RULES`) — chỉ khác là nội dung token giờ theo palette của `dark-mode-maker` § Palette, không phải chép tay riêng ở đây.
 
-**1. CSS — dark là override theo token, viết MỘT lần dùng cho cả 2 ngả** (theo-hệ *khi user chưa chọn light*, và user-chọn-dark tường minh; light = base CSS nên không cần khối riêng):
-```css
-/* mặc định theo hệ — chỉ khi user CHƯA chọn light */
-@media (prefers-color-scheme: dark){
-  html:not([data-theme=light]){ --glass2:…; --border:…; --t1:…; --t2:…; background:#0c0f16 }
-  html:not([data-theme=light]) body{ … } /* prefix từng selector */
-}
-/* user bấm toggle chọn dark tường minh */
-html[data-theme=dark]{ /* CÙNG token như trên */ }
-html[data-theme=dark] body{ … }
-```
-Sinh trang bằng script? Giữ MỘT danh sách rule rồi emit 2 khối với 2 prefix (xem `_DARK_RULES` trong `fdk/tools/build-overstack-docs.py`) — chép tay 2 bản là mầm drift.
-
-**2. `<head>` — chống FOUC** (áp lựa chọn đã lưu TRƯỚC khi CSS render):
-```html
-<script>(function(){try{var t=localStorage.getItem("<tên-trang>-theme");
-if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}})();</script>
-```
-
-**3. NÚT GẠT (switch), KHÔNG phải chip icon rải góc** (feedback lần 3: chip 2 góc "không giống ai") — hàng footer **dính đáy sidebar/nav**: nhãn "Giao diện" bên trái + switch bên phải, vách ngăn mảnh phía trên. Track pill 50×26 có ☀️/🌙 hai đầu, knob trượt; `role="switch"` + `aria-checked` + Enter/Space toggle:
-
-⚠️ **Bài học 200826 — bug thật, không phải giả thuyết:** bản trước để `bottom:-<pad-nav>` là placeholder CHƯA resolve — LLM sinh trang phải tự đoán giá trị số khớp với padding của `nav` (§Navigation), quên/sai là nút gạt lệch khỏi đáy sidebar. Fix: đọc lại đúng biến `--nav-pad-y` đã khai ở `:root` trong §Navigation — KHÔNG hard-code lại số:
-```css
-.theme-row{position:sticky;bottom:calc(-1 * var(--nav-pad-y));margin-top:auto;display:flex;align-items:center;justify-content:space-between;
-  padding:11px 16px;border-top:1px solid rgba(30,90,170,.14);background:…glass…;backdrop-filter:blur(14px)}
-.theme-switch .track{display:inline-block;position:relative;width:50px;height:26px;border-radius:999px;…}
-.theme-switch .track::before{content:'☀️';left:6px;…} .theme-switch .track::after{content:'🌙';right:6px;…}
-.theme-switch .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s}
-.theme-switch.on .knob{left:26px} .theme-switch.on .track{background:…dark…}
-```
-```js
-(function(){var K='<tên-trang>-theme',d=document.documentElement,nav=document.querySelector('nav');if(!nav)return;
-function isDark(){var t=d.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
-var sw=document.createElement('div');sw.className='theme-switch';sw.setAttribute('role','switch');sw.setAttribute('tabindex','0');
-sw.innerHTML='<span class="track"><span class="knob"></span></span>';
-var row=document.createElement('div');row.className='theme-row';
-var lb=document.createElement('span');lb.className='lbl';lb.textContent='Giao diện';row.appendChild(lb);row.appendChild(sw);nav.appendChild(row);
-function paint(){var dk=isDark();sw.classList.toggle('on',dk);sw.setAttribute('aria-checked',dk?'true':'false');
-  sw.setAttribute('aria-label',dk?'Nút gạt giao diện: đang tối — gạt sang sáng':'Nút gạt giao diện: đang sáng — gạt sang tối')}
-function flip(){var n=isDark()?'light':'dark';d.setAttribute('data-theme',n);try{localStorage.setItem(K,n)}catch(e){}paint()}
-sw.addEventListener('click',flip);sw.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();flip()}});paint()})();
-```
-Trang không có sidebar (landing một cột)? Đặt cùng hàng footer của trang, vẫn là NÚT GẠT có nhãn — tuyệt đối không quay lại chip icon trôi nổi ở góc.
-
-## Accessibility & Document Head (REQUIRED)
+### Accessibility & Document Head (REQUIRED)
 
 These are easy to forget and break silently — wire all of them on every page.
 
@@ -1050,7 +1139,7 @@ Add Open Graph (`og:title`/`og:description`/`og:image`) only when the page is me
 <a class="skip-link" href="#main">Skip to content</a>
 ```
 ```css
-.skip-link{position:fixed;top:8px;left:8px;z-index:200;padding:8px 14px;border-radius:10px;
+.skip-link{position:fixed;top:8px;left:8px;z-index:200;padding:8px 16px;border-radius:10px;
   background:var(--glass-1);backdrop-filter:blur(var(--blur-1));border:1px solid var(--border);
   transform:translateY(-150%);transition:transform .2s}
 .skip-link:focus-visible{transform:translateY(0)}
@@ -1080,11 +1169,46 @@ table, .diagram-box text, .mm .node .ct{font-variant-numeric:tabular-nums}
 
 **Headline orphans** — add `text-wrap:balance` to hero/`h2` and `text-wrap:pretty` to body paragraphs so a single word never strands on its own line.
 
-## Self-Contained — CRITICAL
+### Nhúng artifact ngoài — sơ đồ archify qua `<iframe>`
+
+Luật "inline SVG" ở §Best Practices áp cho sơ đồ TỰ VẼ trong trang. Sơ đồ do ENGINE vẽ (`/diagram` → archify — vd mỗi task của `*-seq.html` do `/propose` sinh) là một trang viewer tự chứa, nên nhúng bằng `<iframe>` chứ không chép SVG ra ngoài (chép ra là mất phần gác hình học của archify). Hai điều bắt buộc:
+
+**1. Khung cao VỪA nội dung — người xem không bao giờ phải cuộn trong khung.** Chiều cao cố định (vd `height:840px`) luôn cắt: đo ngày 11/09/2026, viewer archify cao từ 905 đến 1565px tuỳ số message và bề rộng khung (650–1100px), vì còn kèm toolbar và khối Guided views. Dùng recipe đo chiều cao thật lúc chạy, và luôn đặt link mở riêng cạnh khung:
+
+```html
+<iframe class="archify-embed" src="DDMMYY-feature-t1.html" title="T1 — <tên task>" loading="lazy"></iframe>
+<a class="embed-open" href="DDMMYY-feature-t1.html" target="_blank" rel="noopener">Mở sơ đồ riêng ↗</a>
+```
+
+```css
+.archify-embed{display:block;width:100%;height:1000px;border:0;border-radius:14px;background:transparent}
+.embed-open{display:inline-block;margin-top:8px;font-size:12px}
+```
+
+```js
+// Auto-height: đọc scrollHeight THẬT của trang archify (cùng origin) → khung vừa khít, theo dõi đổi cỡ.
+document.querySelectorAll('iframe.archify-embed').forEach(f => {
+  const fit = () => {
+    let d; try { d = f.contentDocument; } catch (e) {}
+    if (!d || !d.documentElement) { f.dataset.fit = 'blocked'; return; }   // file:// — xem giới hạn bên dưới
+    const h = d.documentElement.scrollHeight;
+    if (Math.abs(h - f.offsetHeight) > 2) f.style.height = h + 'px';
+  };
+  f.addEventListener('load', () => { fit(); try { new ResizeObserver(fit).observe(f.contentDocument.body); } catch (e) {} });
+});
+```
+
+Đã đo bằng Playwright (archify 2.17): mở qua http (§Auto-Host), khung bằng đúng `scrollHeight` của nội dung ở cả bề rộng 650px lẫn 1100px, giữ nguyên sau 1 giây (không có vòng lặp đổi cỡ), và không còn thanh cuộn trong khung.
+
+**Giới hạn khi mở bằng `file://`:** Chrome và Firefox coi mỗi file `file://` là một origin riêng, nên trang cha không đọc được `contentDocument`; khung giữ chiều cao mặc định 1000px và vẫn có thể phải cuộn trong khung. Đường thay thế là mở trang qua §Auto-Host (`http://localhost:8765/...`), hoặc bấm "Mở sơ đồ riêng ↗" để xem sơ đồ toàn màn hình — đó là lý do link mở riêng là bắt buộc.
+
+**2. Theme khớp trang chứa — để trống `meta.visual_preset`.** Mặc định của bản cài là `macos` (system font, hợp với liquid-glass). Đừng chép `visual_preset` từ `archify/examples/*.json` (ví dụ sequence có sẵn `signal-flow`, font mono). Chỉ đặt preset khác khi user yêu cầu, và khi đó khai `<meta name="overstack-preset" content="<preset>">` trong trang chứa. Không có meta đó, luật R20 (hook PostToolUse) chặn trang nhúng artifact archify có preset khác `macos`.
+
+### Self-Contained — CRITICAL
 
 The user opens these files directly (`file://`, offline, double-click). The output HTML must make ZERO external requests: no font/CSS/JS CDN links, no remote images, no `@import`, no `<script src>`. Everything (CSS, JS, SVG, icons) lives inline in the one file. `<a href>` hyperlinks to external sites are fine — they are navigation, not resource loads.
 
-## Output Path — CRITICAL
+### Output Path — CRITICAL
 
 **ALWAYS write HTML files to `llmwiki/html/` inside the current project root.**
 
@@ -1096,7 +1220,7 @@ The user opens these files directly (`file://`, offline, double-click). The outp
 - NEVER write to the project root or any other directory.
 - If `llmwiki/html/` does not exist, create it first.
 
-## Auto-Host
+### Auto-Host
 
 After creating the HTML file(s), ALWAYS start a local HTTP server for preview:
 
@@ -1110,7 +1234,7 @@ Notify user: open `http://localhost:8765/llmwiki/html/DDMMYY-<file>.html`
 
 If port 8765 is already in use, skip (server already running).
 
-## Playwright Audit (REQUIRED — final step before handoff, run BEFORE telling the user it's ready)
+### Playwright Audit (REQUIRED — final step before handoff, run BEFORE telling the user it's ready)
 
 ⚠️ **Bài học 200826, thật, không phải giả thuyết:** một trang được sinh ra để tự đọc code rồi làm ĐÚNG THEO SPEC (nút toggle dark/light, collapse sidebar) lại tự bị viết tắt sai — nút theme thành một chip nổi góc-trên-phải rời rạc, đúng anti-pattern chính SKILL.md này cấm (§Theme Toggle, "KHÔNG phải chip icon rải góc"), và sidebar không hề có `.nav-toggle`/`.nav-close`. Lỗi này KHÔNG bị bắt lúc sinh trang — chỉ lộ ra khi user tự mở trang và báo lại. Đọc code (hay đọc SKILL.md) không đủ để biết trang trông ra sao và có tương tác đúng không; phải MỞ THẬT bằng trình duyệt và ĐO, giống hệt kỷ luật đã áp cho mọi PoC trong phiên 200826.
 
@@ -1176,7 +1300,7 @@ await browser.close();
 
 **Nếu audit FAIL: SỬA rồi audit lại — không báo trang đã xong ở trạng thái đỏ.** Đây là cổng chất lượng cuối cùng, tương đương `medic --ci` ở tầng code: đỏ thì đừng giao. Không cần giữ lại script hay ảnh chụp sau khi audit qua — đây là bước verify-rồi-vứt, không phải artifact phải commit (theo đúng quy ước `/playwright-verify`: "File script standalone không vào git — chạy từ scratchpad").
 
-## Multi-File Mode
+### Multi-File Mode
 
 When generating separate pages per wiki file (all files share the same `DDMMYY-` date prefix):
 - Create an `DDMMYY-index.html` overview page (card grid linking to all N pages)
@@ -1185,7 +1309,7 @@ When generating separate pages per wiki file (all files share the same `DDMMYY-`
 - Each page has a nav bar linking to all other pages (highlight current page)
 - Each page has its own animated SVG diagram based on the topic content
 
-## Interactive Prototype / Editable Data-Grid (optional)
+### Interactive Prototype / Editable Data-Grid (optional)
 
 When the user asks to "see how the UI will look", "tạo bảng tương tác thử", or wants a clickable demo of an editable grid/spreadsheet feature, build a **standalone interactive prototype** (same `DDMMYY-<slug>.html`, vanilla JS, no build). ⚠️ **Self-Contained still applies — do NOT pull Tailwind CDN, Google Fonts, or any remote script.** Use plain inline CSS (or an inlined utility layer copied into `<style>`) and the system-font stack from the Font section; the file must open from `file://` with ZERO external requests like every other page this skill emits. These reusable patterns make override/cascade UIs consistent and self-explanatory:
 
@@ -1198,17 +1322,17 @@ When the user asks to "see how the UI will look", "tạo bảng tương tác th�
 
 Keep the chrome (traffic-light header), the system-font stack (`var(--font-text)`), and the liquid-glass blue/white palette consistent with the doc sites (amber/emerald override-state colors in the data-grid pattern above are the one allowed exception — they encode editing state, not theme).
 
-## Best Practices
+### Best Practices
 
 - **THANG CỠ CHỮ COMPACT — tối ưu màn laptop 13″ (feedback user 2026-07-06, đã đảo chiều một lần — KHÔNG tăng size):** GIẢM chứ đừng tăng: body `p` 13–13.5px, `.lead` 14px, nav link 12px (padding dọc ~5px), list/bảng 12.5px, nhãn/caption 10–10.5px, `h2` ~21px, hero `clamp(26px,4vw,40px)`. Tăng cỡ chữ để "dễ đọc" là SAI trên 13″ — ít nội dung lọt màn hình, wrap chật, nhìn tệ hơn; muốn dễ đọc thì chỉnh line-height/contrast, không chỉnh size. Badge đếm số được phép <10px.
 - **SIDEBAR: CUỘN chứ không NÉN (feedback user 2026-07-07):** nav flex-column sẽ flex-shrink co dẹp từng item khi thiếu chỗ — phải chặn: `nav>*{flex-shrink:0}` + `overflow-y:auto`, và ẨN HOÀN TOÀN scrollbar: `nav{scrollbar-width:none;-ms-overflow-style:none} nav::-webkit-scrollbar{width:0;height:0;display:none}`. Stack item luôn giữ chiều cao tự nhiên, thiếu chỗ thì cuộn ngầm.
-- ALWAYS inline SVG directly in the HTML (not external files)
+- ALWAYS inline SVG directly in the HTML (not external files) — áp cho sơ đồ TỰ VẼ. Ngoại lệ duy nhất: sơ đồ do engine archify vẽ, nhúng bằng `<iframe>` theo §Nhúng artifact ngoài
 - ALWAYS use `clamp()` for hero heading size: `font-size: clamp(32px,5vw,56px)`
 - NEVER use `☐` Unicode for checklists — ALWAYS use real `<input type="checkbox">` with `<label for="...">` so items are clickable. Add this CSS for every checklist:
 
 ```css
 .checklist { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-.checklist li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.checklist li { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; color: var(--text-2); cursor: pointer; }
 .checklist li::before { display: none; }
 .checklist input[type="checkbox"] {
   width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #cbd5e1;
@@ -1242,11 +1366,11 @@ Keep the chrome (traffic-light header), the system-font stack (`var(--font-text)
 
 ---
 
-## Output Report
+### Output Report
 
 After all main skill tasks complete, write a propose draft to the wiki.
 
-### Steps
+#### Steps
 
 **1. Build the filename:**
 - Format: `DDMMYY-<ten>.md`
@@ -1256,6 +1380,14 @@ After all main skill tasks complete, write a propose draft to the wiki.
 **2. Write** `llmwiki/wiki/sources/draft/DDMMYY-<ten>.md`:
 
 ```
+---
+type: draft
+title: "DDMMYY-<ten>"
+status: proposed
+tags: [<skill-name>, output-report]
+timestamp: YYYY-MM-DD
+---
+
 # DDMMYY-<ten>
 **Type:** draft
 **Status:** proposed

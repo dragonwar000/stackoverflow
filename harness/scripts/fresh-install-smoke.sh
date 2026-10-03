@@ -49,9 +49,24 @@ TARGET="$(mktemp -d "${TMPDIR:-/tmp}/overstack-fresh.XXXXXX")"
 case "$TARGET" in
   "$ROOT"*) echo "${R}FATAL: mktemp rơi TRONG repo dev ($TARGET) — hỏng cô lập${X}" >&2; exit 3;;
 esac
-cleanup(){ [ "$KEEP" = 1 ] && echo "giữ: $TARGET" || rm -rf "$TARGET"; }
+cleanup(){ [ "$KEEP" = 1 ] && echo "giữ: $TARGET" || { rm -rf "$TARGET"; rm -rf "$TARGET.home"; }; }
 trap cleanup EXIT
 echo "${B}fresh-install-smoke${X} — mode=$MODE  ·  cô lập tại $TARGET"
+
+# nhớ HOME thật cho các kiểm skill (skill global chỉ npx cài được, fixture không có) rồi
+# cô lập HOME cho phần harness ở chế độ local (khỏi soi ~/.claude/harness thật của máy dev).
+REAL_HOME="$HOME"
+# Module orca-graph sống ở repo riêng. Chế độ local phải KÍN MẠNG + tất định → lấy bản engine đã cài trên máy làm nguồn
+# (chụp TRƯỚC khi đổi HOME); máy chưa cài thì ca (G) tự SKIP. Chế độ remote đi đúng đường người-mới: kéo từ GitHub.
+OG_LOCAL="$(cd "${ORCA_GRAPH_REPO:-$REAL_HOME/.orca-graph/repo}" 2>/dev/null && pwd -P || true)"
+if [ "$MODE" = "local" ]; then
+  if [ -n "$OG_LOCAL" ] && git -C "$OG_LOCAL" rev-parse --git-dir >/dev/null 2>&1; then
+    export ORCA_GRAPH_REPO="$OG_LOCAL" ORCA_GRAPH_REF="$(git -C "$OG_LOCAL" rev-parse --abbrev-ref HEAD)"
+  else
+    export ORCA_GRAPH_SKIP=1
+  fi
+  export HOME="$TARGET.home"; mkdir -p "$HOME"
+fi
 
 # ── cài như người mới ─────────────────────────────────────────────────────────
 ( cd "$TARGET" && git init -q )  # bootstrap cần 1 git repo để cắm pre-commit
@@ -59,11 +74,17 @@ if [ "$MODE" = "remote" ]; then
   echo "→ curl github raw (đường người-mới thật, gồm npx skills)"
   ( cd "$TARGET" && curl -fsSL "https://raw.githubusercontent.com/Rheinmir/setup/orca/harness/poc-vendor-neutral/bootstrap.sh" | bash ) >/dev/null 2>&1
 else
-  echo "→ file:// từ working-tree (offline, tất định) — harness + llmwiki, bỏ npx skills"
-  ( cd "$TARGET" && HARNESS_BASE="file://$ROOT/harness/poc-vendor-neutral" \
+  echo "→ file:// từ working-tree (offline, tất định, HOME cô lập) — harness + llmwiki, bỏ npx skills"
+  ( cd "$TARGET" && HARNESS_BASE="file://$ROOT/harness/poc-vendor-neutral" REPO_RAW="file://$ROOT" \
       bash "$ROOT/harness/poc-vendor-neutral/bootstrap.sh" --with-wiki ) >/dev/null 2>&1
+  INSTALL_RC=$?
+  # install.sh tải install-harness.sh vào thư mục tạm → thiếu bundle → clone GitHub orca: engine global
+  # sẽ là code REMOTE. Cài đè từ working tree rồi cmp (cùng lỗi fixture PLAN 110926 đã sửa).
+  bash "$ROOT/harness/scripts/install-harness.sh" --global >/dev/null 2>&1 || bad "install-harness --global từ working tree lỗi"
+  cmp -s "$HOME/.claude/harness/hooks/session_start.py" "$ROOT/llmwiki/.claude/hooks/session_start.py" \
+    && ok "engine global = working tree (cmp hook)" || bad "engine global KHÔNG phải working tree — cổng đang đo code remote"
 fi
-[ $? -eq 0 ] && ok "install exit 0" || bad "install exit≠0"
+[ "${INSTALL_RC:-$?}" -eq 0 ] && ok "install exit 0" || bad "install exit≠0"
 
 # ── PARITY HỨA↔GIAO (GH#77) — CHẠY Ở MỌI MODE, KỂ CẢ --local ────────────────────────────
 # overstack.html + CAPABILITIES.md đều đọc từ ĐĨA nên luôn đồng thuận với nhau — và cùng SAI so
@@ -75,10 +96,11 @@ fi
 # vào riêng --remote = guard phải-nhớ-gọi-tay = guard không tồn tại (đúng bệnh mà cả cổng này sinh
 # ra để chống). Kiểm này KHÔNG cần mạng — chỉ so skill trên đĩa với skill đã tới global.
 echo "${Y}parity hứa↔giao:${X}"
-SK_DIR="${AGENTS_SKILLS_DIR:-$HOME/.agents/skills}"
+SK_DIR="${AGENTS_SKILLS_DIR:-$REAL_HOME/.agents/skills}"
 if [ -d "$SK_DIR" ]; then
   dropped=""
-  for sk in "$ROOT"/skills/*/SKILL.md; do
+  for sk in "$ROOT"/skills/*/SKILL.md "$ROOT"/skills/external/*/SKILL.md; do
+    [ -f "$sk" ] || continue
     n="$(basename "$(dirname "$sk")")"
     [ "$n" = "fdk" ] && continue                      # cố ý không ship xuống user (ADR-004)
     [ -d "$SK_DIR/$n" ] || dropped="$dropped $n"
@@ -156,11 +178,28 @@ fi
 
 # ── (F) orchestration-ready: skill reachable ─────────────────────────────────
 echo "${Y}orchestration-ready:${X}"
-SK="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
-for s in $(contract_list must_reach_skills 2>/dev/null || echo "orchestration orca-cli orca-dispatch-reference"); do
+SK="${CLAUDE_SKILLS_DIR:-$REAL_HOME/.claude/skills}"
+for s in $(contract_list must_reach_skills 2>/dev/null || echo "orca-dispatch-reference"); do
   if [ -e "$SK/$s" ] || [ -e "$SK/$s/SKILL.md" ]; then ok "skill '$s' reachable"
   else bad "skill '$s' THIẾU global ($SK) — cài: npx skills add rheinmir/setup#orca --global --all"; fi
 done
+
+# ── (G) module orca-graph TỚI NƠI: shim ở đường dẫn cũ phải chạy được engine thật ───────────────────────
+# Trước 20/09/2026 KHÔNG cổng nào kiểm điều này: shim đi theo mọi đường copy engine, còn engine thật chỉ được kéo ở một đường
+# → có đường cài để lại "/orca-graph: chưa cài engine" mà smoke, medic và UAT vẫn xanh.
+echo "${Y}orca-graph (module repo riêng):${X}"
+OGS="$HOME/.claude/harness/harness/scripts/orca-graph.py"
+if [ -n "${ORCA_GRAPH_SKIP:-}" ]; then
+  skip "máy này chưa có bản engine local làm nguồn kín mạng — bỏ qua (chạy --remote để kiểm đường thật)"
+elif [ ! -f "$OGS" ]; then
+  bad "global harness thiếu shim orca-graph.py ($OGS)"
+else
+  OGV="$(python3 "$OGS" --version 2>&1 | head -1)"
+  case "$OGV" in
+    orca-graph\ [0-9]*) ok "engine tới nơi qua shim: $OGV";;
+    *) bad "shim có nhưng ENGINE KHÔNG TỚI: $OGV";;
+  esac
+fi
 
 # ── (F) runtime ping — env-dependent, SKIP-không-fail (ceiling) ──────────────
 if command -v orca >/dev/null 2>&1 || command -v orca-ide >/dev/null 2>&1; then

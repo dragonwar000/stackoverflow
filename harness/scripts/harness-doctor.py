@@ -204,12 +204,17 @@ def build_r5(base):
 def build_r7(base):
     # bad = proposed draft missing the Agent table + sequence link; good = complete.
     draft = base / "wiki" / "sources" / "draft"
+    # Tu 100926 moi task can mot so do THAT do archify ve, trang seq nhung bang iframe (R7-c);
+    # khung list diagram-box ve tay khong con duoc tinh.
+    for n in ("t1", "t2"):
+        _w(draft / f"feature-{n}.html", "<!doctype html><html><body>archify 2.17.0 "
+                                        "<svg viewBox='0 0 10 10'></svg></body></html>\n")
     seq_html = (
         "<!doctype html><html><head><style>.msg{opacity:1}</style></head><body>\n"
-        '<div class="diagram-box"><p class="desc">Task one: claude distills the raw '
-        "file into a concept on a safe branch.</p></div>\n"
-        '<div class="diagram-box"><p class="desc">Task two: codex updates wiki/index.md '
-        "for the new concept.</p></div>\n"
+        '<iframe src="feature-t1.html"></iframe><p class="desc">Task one: claude distills the raw '
+        "file into a concept on a safe branch.</p>\n"
+        '<iframe src="feature-t2.html"></iframe><p class="desc">Task two: codex updates wiki/index.md '
+        "for the new concept.</p>\n"
         "</body></html>\n"
     )
     _w(draft / "feature-seq.html", seq_html)
@@ -283,6 +288,32 @@ def build_r16(base):
     _w(good, f"<!doctype html><body><h1>report</h1>"
              f"<footer>File: <code>{good.resolve()}</code> · <code>{good}</code></footer></body>")
     return _content("report_show_path.py", fixture(bad, good))
+
+
+def build_r20(base):
+    bad = base / "llmwiki" / "html" / "docs-bad.html"
+    good = base / "llmwiki" / "html" / "docs-good.html"
+    secs = "".join('<section id="s%d"><h2>S%d</h2></section>' % (i, i) for i in range(5))
+    _w(bad, "<!doctype html><body>%s</body>" % secs)
+    _w(good, "<!doctype html><body><nav>%s</nav>%s</body>"
+       % ("".join('<a href="#s%d">S%d</a>' % (i, i) for i in range(5)), secs))
+    return _content("html_docs_shell.py", fixture(bad, good))
+
+
+def build_r22(base):
+    # R22: slop nhìn thấy được. Fixture phải có CSS THẬT (>400 ký tự) vì luật no-dark-mode bỏ qua
+    # trang tí hon; bản GOOD mang đủ chế độ tối + nút đổi để không dính luôn luật no-theme-toggle.
+    bad = base / "llmwiki" / "html" / "slop-bad.html"
+    good = base / "llmwiki" / "html" / "slop-good.html"
+    bulk = "".join(".r%d{padding:%dpx;margin:%dpx;line-height:1.5;letter-spacing:0}" % (i, i, i) for i in range(20))
+    dark = "[data-theme=dark]{--bg:#0b1220;--ink:#e6edf5}"
+    btn = ('<button id="theme-toggle" onclick="document.documentElement.setAttribute(\'data-theme\',\'dark\');'
+           'localStorage.setItem(\'theme\',\'dark\')">theme</button>')
+    _w(bad, "<!doctype html><html><head><style>%s.card{border-left:3px solid #0a84ff}</style></head>"
+            "<body><div class=card>x</div></body></html>" % bulk)
+    _w(good, "<!doctype html><html><head><style>%s%s.card{border:1px solid #e2e8f0}</style></head>"
+             "<body>%s<div class=card>x</div></body></html>" % (bulk, dark, btn))
+    return _content("html_slop.py", fixture(bad, good))
 
 
 # ── Tier 1b: argv-only / custom-flag content validators ─────────────────────
@@ -496,6 +527,41 @@ def build_r17(base):
                     ("no-fw:no-node", "1" if m1 == m0 else "0", "1")])
 
 
+def build_r21(base):
+    # R21: Stop phải liệt kê file phiên này sửa (BAD: file mới → PHẢI có trong list) và im với
+    # file cũ trước phiên (GOOD: không liệt kê); trang người-đọc trần 15 link, file khác gom nhóm không link.
+    import time
+    if str(HOOKS_DIR) not in sys.path:
+        sys.path.insert(0, str(HOOKS_DIR))
+    try:
+        import hooklib as hl
+    except Exception as e:
+        return _dark("side-effect", "hooklib import failed: %s" % e)
+    r = base / "repo"
+    r.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", str(r)], capture_output=True)
+    _w(r / "old.txt", "x")
+    os.utime(r / "old.txt", (time.time() - 3600,) * 2)
+    _w(r / "new.py", "x")
+    ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 60)) + ".000Z"
+    tp = base / "t.jsonl"
+    _w(tp, json.dumps({"type": "user", "timestamp": ts, "message": {"content": "x"}}))
+    names = {pathlib_name(f) for f in hl.session_touched_files(str(r), str(tp))}
+    # Từ 200926: link CHỈ cho trang người-đọc trong wiki (trần 10 từ 24/09); file khác gom nhóm, KHÔNG được có link.
+    capped = hl.touched_message(["/x/llmwiki/wiki/sources/s%d.md" % i for i in range(45)]).count("file://")
+    other = hl.touched_message(["/x/harness/scripts/e%d.py" % i for i in range(5)])
+    return _result("side-effect", "hooks",
+                   [("new-file:listed", "1" if "new.py" in names else "0", "1"),
+                    ("old-file:silent", "1" if "old.txt" not in names else "0", "1"),
+                    ("reader-cap:10", str(capped), "10"),
+                    ("servers:clickable", "1" if "http://localhost:3000/  ⇄  https://a.vn" in hl.servers_message([{"url": "http://localhost:3000/", "what": "x", "public": ["https://a.vn"]}]) else "0", "1"),
+                    ("non-reader:grouped-no-link", "1" if "file://" not in other and "code / script: 5" in other else "0", "1")])
+
+
+def pathlib_name(p):
+    return os.path.basename(p)
+
+
 # ── Tier 5: aggregate / documentary gate (wiring present + referenced) ──────
 def build_r19(base):
     # R19: chuoi ket luan phai cham dut o nut CHUNG CU. BAD = la la mot suy luan nua (phai BAT);
@@ -587,6 +653,9 @@ RULES = [
     ("R17", "problem-tree-flush", build_r17),
     ("R18", "plan-executable", build_r18),
     ("R19", "evidence-terminal", build_r19),
+    ("R20", "html-docs-shell", build_r20),
+    ("R21", "touched-paths", build_r21),
+    ("R22", "html-slop", build_r22),
 ]
 
 

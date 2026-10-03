@@ -17,6 +17,80 @@ import sys
 from pathlib import Path
 
 
+
+def _ovs_base_mod():
+    import importlib.util
+    here = Path(__file__).resolve()
+    for c in (here.with_name("html_base.py"), Path.home() / ".claude/harness/fdk/tools/html_base.py"):
+        if c.is_file():
+            s = importlib.util.spec_from_file_location("html_base", c); m = importlib.util.module_from_spec(s); s.loader.exec_module(m); return m
+    return None
+
+
+def _ovs_follow(child_html: str) -> str:
+    m = _ovs_base_mod()
+    return m.to_follow(m.apply(child_html)) if m else child_html
+
+
+# Nhãn trong sơ đồ SVG viết tay ghi cứng màu (khảo sát 20/09/2026: 81 chỗ) → chìm trên nền khối,
+# thấp nhất 2,13:1 ở chế độ sáng và 2,70:1 ở chế độ tối.
+# KHÔNG dùng token đổi theo chế độ: nhãn nằm trên HÌNH KHỐI có màu ghi cứng (không đổi theo sáng/tối),
+# nên chữ cũng phải là màu CỐ ĐỊNH, chỉ hạ độ sáng để đạt 4,5:1 trên nền khối sáng nhất lẫn trung tính.
+# Giữ nguyên sắc (đỏ vẫn đỏ, xanh lá vẫn xanh lá) — chỉ tối đi.
+_SVG_TEXT_INK = {
+    "#0a84ff": "#054280", "#5856d6": "#39378a", "#30b0c7": "#144852",
+    "#28a745": "#124c20", "#34c759": "#144c22",
+    "#f08c00": "#613900",
+    "#e0264b": "#81162b", "#ff2d55": "#81172b",
+    "#4a4a55": "#41414b",
+}
+
+
+def _svg_text_tokens(html: str) -> str:
+    """Chỉ đụng fill của <text> (nhãn chữ). Màu của hình khối giữ nguyên — chúng là NỀN, không phải chữ."""
+    import re as _re
+
+    def one(m):
+        tag = m.group(0)
+        return _re.sub(r'fill="(#[0-9a-fA-F]{3,6})"',
+                       lambda f: 'fill="%s"' % _SVG_TEXT_INK.get(f.group(1).lower(), f.group(1)), tag)
+
+    html = _re.sub(r"<text\b[^>]*>", one, html)
+
+    # Nền pha trong suốt (#RRGGBBAA) lấy nền TRANG làm đáy → ở chế độ tối nó thành khối tối, chữ tối
+    # trên khối tối (huy hiệu 2 chữ cái trong sơ đồ persona: 1,37:1). Trộn sẵn lên trắng thành màu ĐẶC,
+    # nền khối không còn phụ thuộc chế độ.
+    def flat(m):
+        r, g, b, al = (int(m.group(1)[i:i + 2], 16) for i in (0, 2, 4, 6))
+        k = al / 255
+        return 'fill="#%02x%02x%02x"' % tuple(round(c * k + 255 * (1 - k)) for c in (r, g, b))
+
+    html = _re.sub(r'fill="#([0-9a-fA-F]{8})"', flat, html)
+    # Sơ đồ viết tay dùng khối màu ghi cứng (không đổi theo chế độ). Ở chế độ tối, nhãn nằm NGOÀI khối
+    # rơi xuống nền trang tối → chữ tối trên nền tối. Cho mỗi sơ đồ một mặt sáng cố định: nền khối và
+    # nhãn lại cùng hệ, đọc được ở cả hai chế độ mà không phải token-hoá toàn bộ hình.
+    css = '<style id="ovs-svg-canvas">svg[role="img"]{background:#f4f7fb;border-radius:12px}</style>'
+    if 'id="ovs-svg-canvas"' not in html:
+        html = _re.sub(r"</head\s*>", css + "</head>", html, count=1, flags=_re.I)
+    return html
+
+
+def _ovs_font(html: str) -> str:
+    """Font mặc định của mọi HTML framework sinh ra = Be Vietnam Pro, NHÚNG (nguồn duy nhất: fdk/tools/html_font.py)."""
+    import importlib.util
+    here = Path(__file__).resolve()
+    for c in (here.with_name("html_font.py"), here.parents[2] / "fdk" / "tools" / "html_font.py", Path.home() / ".claude/harness/fdk/tools/html_font.py"):
+        if c.is_file():
+            s = importlib.util.spec_from_file_location("html_font", c); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+            out = m.apply(html)
+            hb = _ovs_base_mod()          # trang này có toggle RIÊNG → phải tự báo theme cho các iframe nhúng (memory-map, skill-whiteboard)
+            if hb and "<iframe" in out and 'id="ovs-parent-notify"' not in out:
+                k = out.rfind("</body>")
+                if k >= 0:
+                    out = out[:k] + f'<script id="ovs-parent-notify">{hb.PARENT_NOTIFY_JS}</script>' + out[k:]
+            return out
+    return html
+
 def detect_root() -> Path:
     repo = Path(__file__).resolve().parents[2]
     if (repo / "llmwiki").is_dir():
@@ -69,7 +143,7 @@ def skills_by_loop(root: Path):
         sk_dir = Path.home() / ".claude" / "skills"
     by = {}
     n = 0
-    for d in sorted(sk_dir.glob("*/")):
+    for d in sorted([*sk_dir.glob("*/"), *sk_dir.glob("external/*/")]):
         sk = d / "SKILL.md"
         if not sk.is_file():
             continue
@@ -123,15 +197,15 @@ ACCENTS = [("#0a84ff", "10,132,255"), ("#30b0c7", "48,176,199"), ("#5856d6", "88
 LOOP_GROUPS = {
     "dev-loop": (
         [("edit", "✏️ sửa code an toàn"), ("build", "🏗️ dựng & onboard"), ("eval", "📊 eval & vòng lặp")],
-        {"propose": "edit", "plan": "edit", "qc-code": "edit", "teach-me": "edit", "impact-check": "edit", "safe-change": "edit", "verify-before-commit": "edit",
+        {"propose": "edit", "plan": "edit", "qc-code": "edit", "qc-uiux": "edit", "visual-qa": "edit", "teach-me": "edit", "impact-check": "edit", "safe-change": "edit", "verify-before-commit": "edit",
          "build-now-adapt-later": "edit",
          "new-project-setup": "build", "onboard-codebase": "build", "new-skill": "build",
-         "skill-provenance": "build", "doyourmagic": "build",
+         "skill-provenance": "build", "doyourmagic": "build", "br": "build", "ui-kit-from-code": "build", "ui-snapshot": "build", "surface-coverage": "build",
          "wikieval": "eval", "ship": "eval", "loop-runner": "eval", "failure-flywheel": "eval",
          "playwright-verify": "eval"}),
     "orchestrate": (
         [("dispatch", "🐳 điều phối"), ("eval", "📊 đánh giá"), ("ops", "🚀 vận hành & deploy")],
-        {"orca-workflow": "dispatch", "orca-onboard": "dispatch", "orchestration": "dispatch",
+        {"orca-workflow": "dispatch", "orca-graph": "dispatch", "tc-run": "dispatch", "orca-onboard": "dispatch", "orchestration": "dispatch",
          "orca-cli": "dispatch", "orca-dispatch-reference": "dispatch", "wayfinder": "dispatch",
          "orca-handover": "dispatch",
          "council": "eval", "trace-grader": "eval", "orca-eval": "eval",
@@ -140,9 +214,13 @@ LOOP_GROUPS = {
         [("docs", "📄 tài liệu & render"), ("taste", "🎨 thiết kế & style"), ("imagegen", "🖼️ image→code/gen"),
          ("caveman", "🦴 caveman"), ("fdk", "🛠️ framework-dev"), ("utility", "🔧 tiện ích khác")],
         {"docs-site-macos": "docs", "extract-site": "docs", "md-to-html": "docs",
-         "web-crawl": "docs", "web-clone": "docs",
+         "web-crawl": "docs", "web-clone": "docs", "whales-storying": "docs",
          "tour-guide": "taste", "tour-guide-supademo": "taste",
-         "brandkit": "taste", "hallmark": "taste", "prd-grade-fe": "taste", "design-taste-frontend": "taste", "design-taste-frontend-v1": "taste",
+         "brandkit": "taste", "hallmark": "taste", "design-prim": "taste", "dark-mode-maker": "taste", "prd-grade-fe": "taste", "design-taste-frontend": "taste", "design-taste-frontend-v1": "taste",
+         "timeline": "taste", "blur": "taste",
+         "scroll-effects": "taste", "gsap-scrolltrigger-pin": "taste", "lenis-smooth-scroll": "taste",
+         "threejs-particle-morph": "taste", "svg-stroke-reveal": "taste", "css-scroll-driven-native": "taste",
+         "mask-reveal-transition": "taste", "infinite-webgl-grid": "taste",
          "gpt-taste": "taste", "high-end-visual-design": "taste", "stitch-design-taste": "taste",
          "minimalist-ui": "taste", "industrial-brutalist-ui": "taste", "redesign-existing-projects": "taste",
          "cursor-animated-sites": "docs", "diagram": "docs",
@@ -151,7 +229,7 @@ LOOP_GROUPS = {
          "cavecrew": "caveman", "caveman": "caveman", "caveman-commit": "caveman", "caveman-compress": "caveman",
          "caveman-help": "caveman", "caveman-review": "caveman", "caveman-stats": "caveman",
          "fdk": "fdk", "fdk-uat": "fdk", "medic": "fdk", "harness-tour": "fdk", "harness-update": "fdk", "health-check": "fdk",
-         "snapshot-push": "fdk", "sync-template": "fdk", "docs-curate": "fdk",
+         "snapshot-push": "fdk", "sync-template": "fdk", "tidy": "fdk",
          "agent-reach": "utility",
          "check-approve": "utility", "computer-use": "utility", "find-skills": "utility",
          "full-output-enforcement": "utility", "join-project": "utility", "last30days": "utility",
@@ -194,7 +272,7 @@ nav
 nav .logo small{display:block;font-size:10px;font-weight:600;color:var(--t2);-webkit-text-fill-color:var(--t2);letter-spacing:0}
 nav a{position:relative;overflow:hidden;padding:5px 11px;border-radius:9px;font-size:12px;color:var(--t2);text-decoration:none;transition:background .15s,color .15s}nav a:hover{background:rgba(10,132,255,.06);color:#0a84ff}nav a.active{color:#0a84ff;background:rgba(10,132,255,.08);font-weight:600}
 nav a .ic{display:inline-block;width:17px;margin-right:6px;text-align:center;opacity:.95}
-nav .grp{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#9aa4b2;margin:12px 12px 2px}
+nav .grp{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ovs-ink,#1c2230);margin:20px 12px 4px}
 .nav-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--t2);cursor:pointer;background:rgba(0,0,0,.05);border:none;overflow:hidden}.nav-close:hover{color:#0a84ff;background:rgba(10,132,255,.1)}
 .nav-toggle{position:fixed;top:12px;left:12px;z-index:120;width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--t2);cursor:pointer;background:linear-gradient(165deg,rgba(255,255,255,.5),rgba(255,255,255,.24));backdrop-filter:blur(24px) saturate(1.7);-webkit-backdrop-filter:blur(24px) saturate(1.7);border:1px solid transparent;box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 0 0 1px rgba(30,90,170,.08),0 2px 10px rgba(30,90,170,.12);transition:opacity .2s;overflow:hidden}body:not(.nav-collapsed) .nav-toggle{opacity:0;pointer-events:none}body.nav-collapsed nav{transform:translateX(-100%)}body.nav-collapsed{padding-left:0}@media(max-width:640px){body{padding-left:0}}
 .ripple-ink{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.7) 0%,rgba(255,255,255,.28) 38%,rgba(10,132,255,.2) 72%,transparent 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -10px 20px rgba(10,132,255,.12),0 0 14px rgba(10,132,255,.1);backdrop-filter:blur(2px) saturate(1.25);-webkit-backdrop-filter:blur(2px) saturate(1.25);transform:scale(0);opacity:1;animation:rippleGrow .6s cubic-bezier(.25,.46,.45,.94) forwards}
@@ -208,10 +286,10 @@ section{position:relative}.sec::before{content:'';position:absolute;top:0;bottom
 .inner{position:relative;max-width:1080px;margin:0 auto;padding:40px 24px 44px}
 .tag{display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;margin-bottom:10px}
 h2{font-size:21px;letter-spacing:-.02em;color:#1d1d1f;margin:0 0 6px}.lead{font-size:14px;color:var(--t2);max-width:840px;margin:0 0 8px}
-h3{font-size:14px;margin:20px 0 6px;color:#1d1d1f}
+h3{font-size:17px;margin:20px 0 6px;color:#1d1d1f}
 p{margin:10px 0;max-width:860px;font-size:13.5px}
 .card{background:var(--glass2);backdrop-filter:blur(8px) saturate(1.1);-webkit-backdrop-filter:blur(8px) saturate(1.1);border:1px solid var(--border);border-radius:16px;box-shadow:var(--edge),0 4px 20px rgba(0,0,0,.06);padding:18px 20px;margin-top:14px}
-.card h4{margin:0 0 9px;font-size:13.5px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.grid3{grid-template-columns:1fr 1fr 1fr}@media(max-width:780px){.grid,.grid3{grid-template-columns:1fr}}
+.card h4{margin:0 0 9px;font-size:15px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.grid3{grid-template-columns:1fr 1fr 1fr}@media(max-width:780px){.grid,.grid3{grid-template-columns:1fr}}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:12px}
 .pcard{display:flex;gap:10px;align-items:flex-start;background:var(--glass2);border:1px solid var(--border);border-radius:12px;padding:10px 11px}
 .pcard .pav{width:36px;height:36px;flex-shrink:0}.pcard .pn{font-size:12px;font-weight:700;color:var(--t1)}
@@ -233,7 +311,7 @@ ol.ck{margin:12px 0 0;padding-left:20px}ol.ck li{font-size:12.5px;color:var(--t2
 table{width:100%;border-collapse:collapse;margin:14px 0;background:var(--glass3);backdrop-filter:blur(4px);border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:12.5px;box-shadow:var(--edge),0 4px 18px rgba(0,0,0,.05)}
 th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--t2);background:rgba(10,132,255,.05)}tr:last-child td{border-bottom:none}td code{white-space:nowrap}
 .note{background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.25);border-radius:14px;padding:16px 18px;margin-top:14px}
-.note h4{margin:0 0 8px;color:#b46a00}
+.note h4{margin:0 0 8px;font-size:15px;color:#b46a00}
 footer{max-width:1080px;margin:0 auto;padding:26px 24px 60px;font-size:12px;color:var(--t2);border-top:1px solid var(--border)}
 /* mind map — distilled từ skills-cheatsheet (node chip glass + chevron + collapse, default close) */
 .mm{overflow-x:auto;padding:14px 4px 6px}
@@ -246,7 +324,7 @@ footer{max-width:1080px;margin:0 auto;padding:26px 24px 60px;font-size:12px;colo
 .mm .node:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(20,40,90,.12)}
 .mm .node .nm{font-size:13px;font-weight:700;letter-spacing:-.01em}
 .mm .node .ds{font-size:10.5px;color:var(--t2);font-weight:500}
-.mm .node .ct{font-size:10px;color:#fff;font-weight:700;padding:1px 7px;border-radius:999px;position:absolute;top:-8px;right:-8px;background:#0a84ff}
+.mm .node .ct{font-size:10px;color:#fff;font-weight:700;padding:1px 7px;border-radius:999px;position:absolute;top:-8px;right:-8px;background:#0059b8}
 .mm .node.has-children::after{content:'';position:absolute;right:-7px;top:50%;width:6px;height:6px;border-right:2px solid var(--t2);border-bottom:2px solid var(--t2);transform:translateY(-50%) rotate(-45deg);opacity:.5}
 .mm .node.collapsed-parent::after{transform:translateY(-50%) rotate(45deg)}
 .mm .node.root{background:linear-gradient(135deg,rgba(10,132,255,.16),rgba(88,86,214,.14));border-color:rgba(10,132,255,.4)}
@@ -255,17 +333,17 @@ footer{max-width:1080px;margin:0 auto;padding:26px 24px 60px;font-size:12px;colo
 .mm-links{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:0}
 .mm-links path{fill:none;stroke-width:2.2;opacity:.55;stroke-linecap:round}
 .mm .tree{position:relative;z-index:1}
-.mm .b-wiki .nm{color:#1f8a9c}.mm .b-wiki .ct{background:#30b0c7}.mm .b-wiki.node{border-color:rgba(48,176,199,.4)}
-.mm .b-dev .nm{color:#5856d6}.mm .b-dev .ct{background:#5856d6}.mm .b-dev.node{border-color:rgba(88,86,214,.4)}
-.mm .b-orch .nm{color:#e07b00}.mm .b-orch .ct{background:#ff9500}.mm .b-orch.node{border-color:rgba(255,149,0,.42)}
-.mm .b-utils .nm{color:#1e8e3e}.mm .b-utils .ct{background:#34c759}.mm .b-utils.node{border-color:rgba(52,199,89,.4)}
-.mm .b-rule .nm{color:#e0264b}.mm .b-rule .ct{background:#ff2d55}.mm .b-rule.node{border-color:rgba(255,45,85,.4)}
-.mm .g0 .nm{color:#0a5ec7}.mm .g0 .ct{background:#0a84ff}.mm .g0.node{border-color:rgba(10,132,255,.4)}
-.mm .g1 .nm{color:#1f8a9c}.mm .g1 .ct{background:#30b0c7}.mm .g1.node{border-color:rgba(48,176,199,.4)}
+.mm .b-wiki .nm{color:#1f8a9c}.mm .b-wiki .ct{background:#0b6472}.mm .b-wiki.node{border-color:rgba(48,176,199,.4)}
+.mm .b-dev .nm{color:#5856d6}.mm .b-dev .ct{background:#4338ca}.mm .b-dev.node{border-color:rgba(88,86,214,.4)}
+.mm .b-orch .nm{color:#e07b00}.mm .b-orch .ct{background:#954508}.mm .b-orch.node{border-color:rgba(255,149,0,.42)}
+.mm .b-utils .nm{color:#1e8e3e}.mm .b-utils .ct{background:#0f6a2f}.mm .b-utils.node{border-color:rgba(52,199,89,.4)}
+.mm .b-rule .nm{color:#e0264b}.mm .b-rule .ct{background:#d82648}.mm .b-rule.node{border-color:rgba(255,45,85,.4)}
+.mm .g0 .nm{color:#0a5ec7}.mm .g0 .ct{background:#0870d8}.mm .g0.node{border-color:rgba(10,132,255,.4)}
+.mm .g1 .nm{color:#1f8a9c}.mm .g1 .ct{background:#217b8b}.mm .g1.node{border-color:rgba(48,176,199,.4)}
 .mm .g2 .nm{color:#5856d6}.mm .g2 .ct{background:#5856d6}.mm .g2.node{border-color:rgba(88,86,214,.4)}
-.mm .g3 .nm{color:#1e8e3e}.mm .g3 .ct{background:#34c759}.mm .g3.node{border-color:rgba(52,199,89,.4)}
-.mm .g4 .nm{color:#c77f00}.mm .g4 .ct{background:#ff9500}.mm .g4.node{border-color:rgba(255,149,0,.42)}
-.mm .g5 .nm{color:#c81e4a}.mm .g5 .ct{background:#ff2d55}.mm .g5.node{border-color:rgba(255,45,85,.4)}
+.mm .g3 .nm{color:#1e8e3e}.mm .g3 .ct{background:#217f38}.mm .g3.node{border-color:rgba(52,199,89,.4)}
+.mm .g4 .nm{color:#c77f00}.mm .g4 .ct{background:#a35f00}.mm .g4.node{border-color:rgba(255,149,0,.42)}
+.mm .g5 .nm{color:#c81e4a}.mm .g5 .ct{background:#d82648}.mm .g5.node{border-color:rgba(255,45,85,.4)}
 /* ── redesign upgrades (a11y focus · orphan-fix · smooth-scroll · tabular số) ── */
 html{scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
@@ -279,7 +357,8 @@ nav a:active{transform:translateY(.5px)}
 .code-copy:active,.nav-toggle:active,.nav-close:active{transform:scale(.94)}
 
 /* theme-switch — NÚT GẠT sáng/tối, hàng footer dính ĐÁY sidebar (feedback 2026-07-06: đừng rải 2 góc, đừng chen dưới logo) */
-.theme-row{position:sticky;bottom:-18px;margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-left:-12px;margin-right:-12px;margin-bottom:-18px;padding:11px 16px;border-top:1px solid rgba(30,90,170,.14);background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(240,248,255,.65));backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4)}
+/* 160926: background:transparent (không phải fill riêng, không phải inherit), KHÔNG backdrop-filter riêng — .theme-row là con của nav (đã tự blur rồi); một backdrop-filter thứ 2 chồng lên tạo dải "kính mờ kép" nhìn như khối riêng dù 0 màu, bắt được bằng ảnh chụp thật (bug thật: "div này cho transparency luôn luôn đi chứ" / "tất cả các layer ở dưới vị trí này đều không màu cho tôi") */
+.theme-row{position:sticky;bottom:-18px;margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-left:-12px;margin-right:-12px;margin-bottom:-18px;padding:11px 16px;border-top:1px solid rgba(30,90,170,.14);background:transparent}
 .theme-row .lbl{font-size:10.5px;font-weight:600;letter-spacing:.02em;color:var(--t2)}
 .theme-switch{display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .theme-switch .track{position:relative;width:50px;height:26px;border-radius:999px;background:linear-gradient(165deg,rgba(255,255,255,.6),rgba(255,255,255,.3));border:1px solid rgba(30,90,170,.2);box-shadow:inset 0 1px 3px rgba(30,90,170,.14);transition:background .2s,border-color .2s}
@@ -287,28 +366,32 @@ nav a:active{transform:translateY(.5px)}
 .theme-switch .track::after{content:'🌙';position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px}
 .theme-switch .knob{position:absolute;z-index:1;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(20,40,90,.3);transition:left .18s ease}
 .theme-switch.on .knob{left:26px}
-.theme-switch.on .track{background:linear-gradient(165deg,#2b3040,#191d27);border-color:rgba(120,160,220,.3)}
-.theme-switch:active .knob{transform:scale(.92)}"""
+.theme-switch.on .track{background:linear-gradient(165deg,#2c2c30,#19191b);border-color:rgba(255,255,255,.14)}
+.theme-switch:active .knob{transform:scale(.92)}
+.theme-reveal{filter:drop-shadow(0 0 1px rgba(255,255,255,.95)) drop-shadow(0 0 8px rgba(255,255,255,.5)) drop-shadow(0 0 30px var(--reveal-tint,rgba(10,132,255,.35)))}"""
 
 # ── Dark mode (issue #14) + toggle sáng/tối (feedback 2026-07-06) ──────────────
 # MỘT nguồn _DARK_RULES sinh RA HAI khối CSS (chống drift giữa 2 bản):
 #   (a) @media prefers-color-scheme — mặc định theo hệ, CHỈ khi user chưa chọn light
 #   (b) html[data-theme=dark]      — user bấm toggle chọn dark tường minh (localStorage)
 # Selector dùng "&" làm placeholder cho <html>; light = base CSS nên không cần khối riêng.
+# 160926: palette trung tính kiểu thị trường (GitHub Dark/Vercel/Linear) — bản trước ngả navy
+# (--border xanh bão hoà, nền/glass pha xanh), feedback thật "dở tệ, chọn lại theo thị trường".
+# Viền TRẮNG TRONG SUỐT thay vì màu bão hoà là đúng cách GitHub/Vercel/Linear vẽ chrome tối.
 _DARK_RULES = [
-    ("&", "--glass2:rgba(30,34,44,.72);--glass3:rgba(36,40,52,.9);"
-          "--edge:inset 0 1px 0 rgba(255,255,255,.06);--border:rgba(120,160,220,.18);"
-          "--t1:#e7e9ee;--t2:#9aa2b1;background:#0c0f16;scrollbar-color:transparent transparent"),
+    ("&", "--glass2:rgba(32,32,36,.72);--glass3:rgba(39,39,44,.9);"
+          "--edge:inset 0 1px 0 rgba(255,255,255,.06);--border:rgba(255,255,255,.10);"
+          "--t1:#f4f4f5;--t2:#a1a1aa;background:#09090b;scrollbar-color:transparent transparent"),
     ("& body", "color:var(--t1);background:radial-gradient(900px 500px at 12% -10%,rgba(10,132,255,.14),transparent 60%),"
                "radial-gradient(700px 420px at 95% 12%,rgba(88,86,214,.12),transparent 55%),"
-               "linear-gradient(180deg,#0d1017,#0a0d13)"),
-    ("& h1,& h2,& h3,& h4", "color:#f2f4f8"),
-    ("& nav", "background:rgba(18,21,28,.82)"),
+               "linear-gradient(180deg,#0a0a0c,#08080a)"),
+    ("& h1,& h2,& h3,& h4", "color:#f4f4f5"),
+    ("& nav", "background:rgba(20,20,23,.82)"),
     ("& table th,& table td", "border-color:var(--border)"),
     ("& table th", "background:rgba(255,255,255,.04)"),
     ("& .card,& .note,& .kpi .b,& .mm .node,& .diagram-box", "background:var(--glass2)"),
     ("& a", "color:#5fa8ff"),
-    ("& .theme-row", "border-top-color:var(--border);background:linear-gradient(180deg,rgba(24,28,38,.7),rgba(16,20,28,.85))"),
+    ("& .theme-row", "border-top-color:var(--border)"),  # background:transparent ở base đã tự lo, không cần override riêng
 ]
 
 
@@ -326,8 +409,37 @@ JS = r"""
 var sw=document.createElement('div');sw.className='theme-switch';sw.id='theme-toggle';sw.dataset.noRipple='1';sw.setAttribute('role','switch');sw.setAttribute('tabindex','0');sw.innerHTML='<span class="track"><span class="knob"></span></span>';
 var row=document.createElement('div');row.className='theme-row';var lb=document.createElement('span');lb.className='lbl';lb.textContent='Giao diện';row.appendChild(lb);row.appendChild(sw);nav.appendChild(row);
 function paint(){var dk=isDark();sw.classList.toggle('on',dk);sw.setAttribute('aria-checked',dk?'true':'false');sw.setAttribute('aria-label',dk?'Nút gạt giao diện: đang tối — gạt sang sáng':'Nút gạt giao diện: đang sáng — gạt sang tối');sw.title=sw.getAttribute('aria-label')}
-function flip(){var next=isDark()?'light':'dark';d.setAttribute('data-theme',next);try{localStorage.setItem(K,next)}catch(e){}paint()}
-sw.addEventListener('click',flip);sw.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();flip()}});
+var busy=false;
+function commit(next){d.setAttribute('data-theme',next);try{localStorage.setItem(K,next)}catch(e){}paint()}
+function flip(e){
+  if(busy)return;var next=isDark()?'light':'dark';
+  var r=sw.getBoundingClientRect();
+  // điểm tỏa = con trỏ chuột lúc bấm, KẸP trong biên nút; Enter/Space (không toạ độ) -> tâm nút
+  var x=(e&&typeof e.clientX==='number')?Math.min(Math.max(e.clientX,r.left),r.right):r.left+r.width/2;
+  var y=(e&&typeof e.clientY==='number')?Math.min(Math.max(e.clientY,r.top),r.bottom):r.top+r.height/2;
+  var reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var bg=next==='dark'?'#09090b':'#f7fbff';
+  var tint=next==='dark'?'rgba(90,168,255,.28)':'rgba(10,132,255,.20)';
+  var canAnimate='animate' in document.createElement('div');
+  busy=true;
+  var el=document.createElement('div');el.className='theme-reveal';el.style.cssText='position:fixed;inset:0;z-index:300;pointer-events:none;will-change:clip-path;background:'+bg;
+  el.style.setProperty('--reveal-tint',tint);
+  document.body.appendChild(el);
+  if(reduced||!canAnimate){
+    el.style.cssText+=';opacity:0;transition:opacity .075s linear';
+    requestAnimationFrame(function(){el.style.opacity='1'});
+    setTimeout(function(){commit(next);el.style.opacity='0';setTimeout(function(){el.remove();busy=false},90)},90);
+    return;
+  }
+  var maxR=Math.hypot(Math.max(x,innerWidth-x),Math.max(y,innerHeight-y));
+  var grow=el.animate([{clipPath:'circle(0px at '+x+'px '+y+'px)'},{clipPath:'circle('+maxR+'px at '+x+'px '+y+'px)'}],{duration:560,easing:'cubic-bezier(.42,0,1,1)',fill:'forwards'});
+  grow.onfinish=function(){
+    commit(next);
+    var fadeOut=el.animate([{opacity:1},{opacity:0}],{duration:180,easing:'ease-out',fill:'forwards'});
+    fadeOut.onfinish=function(){el.remove();busy=false};
+  };
+}
+sw.addEventListener('click',flip);sw.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();flip(e)}});
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',paint)}catch(e){}paint()})();
 (function(){const n=document.querySelector('nav');if(!n)return;const o=document.createElement('button');o.className='nav-toggle';o.textContent='☰';o.setAttribute('aria-label','Mở menu điều hướng');document.body.appendChild(o);const c=document.createElement('button');c.className='nav-close';c.textContent='✕';c.setAttribute('aria-label','Đóng menu điều hướng');n.appendChild(c);o.onclick=function(){document.body.classList.remove('nav-collapsed')};c.onclick=function(){document.body.classList.add('nav-collapsed')};if(matchMedia('(max-width:640px)').matches)document.body.classList.add('nav-collapsed')})();
 (function(){var ls=[].slice.call(document.querySelectorAll('nav a')),ss=[].slice.call(document.querySelectorAll('section[id]'));var ob=new IntersectionObserver(function(es){var a='';es.forEach(function(e){if(e.isIntersecting)a=e.target.id});if(a)ls.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+a)})},{rootMargin:'-40% 0px -55% 0px'});ss.forEach(function(s){ob.observe(s)})})();
@@ -335,18 +447,29 @@ try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',paint)}
 (function(){var mm=document.querySelector('.mm');if(!mm)return;var NS='http://www.w3.org/2000/svg';function colorOf(n){return n.classList.contains('b-wiki')?'#30b0c7':n.classList.contains('b-dev')?'#5856d6':n.classList.contains('b-orch')?'#ff9500':n.classList.contains('b-utils')?'#34c759':n.classList.contains('b-rule')?'#ff2d55':n.classList.contains('g0')?'#0a84ff':n.classList.contains('g1')?'#30b0c7':n.classList.contains('g2')?'#5856d6':n.classList.contains('g3')?'#34c759':n.classList.contains('g4')?'#ff9500':n.classList.contains('g5')?'#ff2d55':'#9aa4b2';}function draw(){var canvas=mm.querySelector('.mm-canvas'),svg=mm.querySelector('.mm-links');if(!canvas||!svg)return;var w=canvas.offsetWidth,h=canvas.offsetHeight;svg.setAttribute('width',w);svg.setAttribute('height',h);svg.setAttribute('viewBox','0 0 '+w+' '+h);while(svg.firstChild)svg.removeChild(svg.firstChild);var cR=canvas.getBoundingClientRect();[].slice.call(canvas.querySelectorAll('.node.has-children')).forEach(function(p){var row=p.parentElement,kids=null,ch=row.children;for(var i=0;i<ch.length;i++){if(ch[i].classList.contains('children'))kids=ch[i];}if(!kids||kids.classList.contains('collapsed'))return;var pr=p.getBoundingClientRect(),px=pr.right-cR.left,py=pr.top+pr.height/2-cR.top;[].slice.call(kids.children).forEach(function(crow){var cn=crow.querySelector(':scope > .node');if(!cn)return;var rr=cn.getBoundingClientRect(),cx=rr.left-cR.left,cy=rr.top+rr.height/2-cR.top,dx=Math.max(22,(cx-px)*0.55);var pa=document.createElementNS(NS,'path');pa.setAttribute('d','M'+px+' '+py+' C'+(px+dx)+' '+py+' '+(cx-dx)+' '+cy+' '+cx+' '+cy);pa.setAttribute('stroke',colorOf(cn));svg.appendChild(pa);});});}[].slice.call(mm.querySelectorAll('.node.has-children')).forEach(function(n){var row=n.parentElement,kids=null,c=row.children;for(var i=0;i<c.length;i++){if(c[i].classList.contains('children'))kids=c[i];}if(!kids)return;if(n.classList.contains('cat')){kids.classList.add('collapsed');n.classList.add('collapsed-parent');}n.setAttribute('tabindex','0');n.setAttribute('role','button');n.setAttribute('aria-expanded',String(!kids.classList.contains('collapsed')));var _tog=function(e){e.stopPropagation();if(e.preventDefault)e.preventDefault();var collapsed=kids.classList.toggle('collapsed');n.classList.toggle('collapsed-parent',collapsed);n.setAttribute('aria-expanded',String(!collapsed));draw();};n.addEventListener('click',_tog);n.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '||e.key==='Spacebar')_tog(e);});});draw();addEventListener('load',function(){setTimeout(draw,60);});addEventListener('resize',function(){clearTimeout(window.__mmt);window.__mmt=setTimeout(draw,120);},{passive:true});})();
 (function(){var C='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',K='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';document.querySelectorAll('pre.code-block').forEach(function(pre){if(pre.dataset.copy)return;pre.dataset.copy='1';var code=pre.textContent;var w=document.createElement('div');w.className='code-wrap';pre.parentNode.insertBefore(w,pre);w.appendChild(pre);var b=document.createElement('button');b.className='code-copy';b.title='Copy';b.setAttribute('aria-label','Copy');b.innerHTML=C;w.appendChild(b);b.addEventListener('click',function(){var done=function(){b.innerHTML=K;b.classList.add('copied');setTimeout(function(){b.innerHTML=C;b.classList.remove('copied');},1500);};if(navigator.clipboard){navigator.clipboard.writeText(code).then(done,done);}else{var ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}ta.remove();done();}});});})();
 (function(){function attach(el){el.addEventListener('pointerdown',function(e){var r=el.getBoundingClientRect();var x=e.clientX-r.left,y=e.clientY-r.top;var rad=Math.hypot(Math.max(x,r.width-x),Math.max(y,r.height-y));var ink=document.createElement('span');ink.className='ripple-ink';ink.style.width=ink.style.height=rad*2+'px';ink.style.left=(x-rad)+'px';ink.style.top=(y-rad)+'px';el.appendChild(ink);ink.addEventListener('animationend',function(){ink.remove()});});}document.querySelectorAll('nav a, .nav-toggle, .nav-close').forEach(function(el){el.dataset.noRipple='1';attach(el);});})();
-(function(){document.addEventListener('pointerdown',function(e){var el=e.target.closest('button, .nav-link, .collapse-toggle, .checklist label');if(!el||el.dataset.noRipple)return;var r=el.getBoundingClientRect();var d=Math.max(r.width,r.height)*1.2;var s=document.createElement('span');s.className='ripple';s.style.cssText='width:'+d+'px;height:'+d+'px;left:'+(e.clientX-r.left-d/2)+'px;top:'+(e.clientY-r.top-d/2)+'px';if(getComputedStyle(el).position==='static')el.style.position='relative';el.style.overflow='hidden';el.appendChild(s);s.addEventListener('animationend',function(){s.remove()});});})();
+(function(){document.addEventListener('pointerdown',function(e){var el=e.target.closest('button, .nav-link, .collapse-toggle, .checklist label');if(!el||el.dataset.noRipple)return;var r=el.getBoundingClientRect();var d=Math.max(r.width,r.height)*1.2;var s=document.createElement('span');s.className='ripple';s.style.cssText='width:'+d+'px;height:'+d+'px;left:'+(e.clientX-r.left-d/2)+'px;top:'+(e.clientY-r.top-d/2)+'px';if(getComputedStyle(el).position==='static'){el.style.position='relative';el.style.inset='auto'}el.style.overflow='hidden';el.appendChild(s);s.addEventListener('animationend',function(){s.remove()});});})();
 """
 
 
 def accent_css(n: int) -> str:
-    out = []
+    out, dark = [], []
     for i in range(n):
         hexc, rgb = ACCENTS[i % len(ACCENTS)]
         out.append(f"#s{i} .tag{{background:rgba({rgb},.12);color:{hexc}}}"
                    f"#s{i} .card h4{{color:{hexc}}}#s{i} .card li::before{{color:{hexc}}}"
                    f".s{i}::before{{background:linear-gradient(180deg,rgba({rgb},.05),transparent 55%)}}")
-    return "\n".join(out)
+        # 160926: .tag rgba(...,.12) trên nền gần-đen của dark mode ra pill gần vô hình. Vòng sửa 1
+        # (chỉ nâng alpha nền+viền) chưa đủ vì color:hexc (chữ) cùng tông nền → đo Playwright ra
+        # 1.0-1.4:1. Vòng sửa 2 (nâng alpha nền lên .26 + chữ trắng) VẪN fail với accent sáng
+        # (teal/green/orange) — nền tint SÁNG (kênh G/R cao) ở alpha .26 làm mất chỗ tương phản
+        # cho chữ trắng đứng trên. Sửa đúng: GIỮ nền tối/mỏng (alpha .12, gần với nền trang), border
+        # đậm hơn (alpha .55) để định hình cái pill, chữ trắng đứng trên nền THẬT SỰ tối — không
+        # phụ thuộc kênh màu nào của accent. Đo lại bằng Playwright xác nhận ≥ 3.0:1 cả 6 accent.
+        dark.append(f"#s{i} .tag{{background:rgba({rgb},.12);border:1px solid rgba({rgb},.55);color:#f2f4f8}}")
+    dark_block = "\n".join(dark)
+    return ("\n".join(out)
+            + "\n@media (prefers-color-scheme: dark){\nhtml:not([data-theme=light]) " + dark_block.replace("\n", "\nhtml:not([data-theme=light]) ") + "\n}\n"
+            + "html[data-theme=dark] " + dark_block.replace("\n", "\nhtml[data-theme=dark] "))
 
 
 # ── sections (prose tay; bảng live tiêm vào) ──────────────────────────────────────────────
@@ -500,7 +623,7 @@ def sections(root: Path):
          _subtree("b-rule", "verified:true — đã chốt", "đã verify; self-test giữ trung thực", _bt, count=len(_bt))],
         count=len(_bf) + len(_bt)))
 
-    mindmap_html = ('<div class="mm"><div class="mm-canvas"><svg class="mm-links"></svg>'
+    mindmap_html = ('<div class="mm"><div class="mm-canvas"><svg class="mm-links" aria-hidden="true"></svg>'
                     '<div class="tree"><div class="row">'
                     + _node("root has-children", "overstack", "gõ /<tên> để gọi · %d rule" % n_rules, n_sk)
                     + '<div class="children">' + "".join(branches) + '</div></div></div></div></div>')
@@ -911,7 +1034,7 @@ def sections(root: Path):
     _n_val = len(list((root / "harness" / "validators").glob("*.py"))) if (root / "harness" / "validators").is_dir() else 0
     _n_hook = len(list((root / "llmwiki" / ".claude" / "hooks").glob("*.py"))) if (root / "llmwiki" / ".claude" / "hooks").is_dir() else 0
     _facts = [  # CHỈ FACT ỔN ĐỊNH (đổi thì regen cùng commit → docs-probe xanh); mỗi dòng có nguồn + lệnh
-        ("skill", n_sk, "đĩa", "ls skills/*/SKILL.md | wc -l"),
+        ("skill", n_sk, "đĩa", "ls skills/*/SKILL.md skills/external/*/SKILL.md | wc -l"),
         ("rule", n_rules, "policy", "grep -c 'id: R' harness/poc-vendor-neutral/policy.yaml"),
         ("validator", _n_val, "đĩa", "ls harness/validators/*.py | wc -l"),
         ("hook", _n_hook, "đĩa", "ls llmwiki/.claude/hooks/*.py | wc -l"),
@@ -1021,7 +1144,7 @@ def sections(root: Path):
         f = root / "llmwiki" / "html" / fname
         if not f.is_file():
             continue
-        doc = f.read_text(encoding="utf-8").replace("&", "&amp;").replace('"', "&quot;")
+        doc = _ovs_follow(f.read_text(encoding="utf-8")).replace("&", "&amp;").replace('"', "&quot;")   # bản NHÚNG: không nút riêng, theo theme trang mẹ
         emb.append(f'<h3>{title}</h3><p class="lead">{why}</p>'
                    f'<iframe title="{title}" style="width:100%;height:640px;border:1px solid '
                    f'var(--line,#d8e2f0);border-radius:12px;background:#fff" '
@@ -1106,7 +1229,7 @@ def render(root: Path) -> str:
 
 
 def main():
-    content = render(ROOT)
+    content = _ovs_font(_svg_text_tokens(render(ROOT)))
     if UNCLASSIFIED:   # hỏi-1-lần: nhắc dev khai nhóm cho skill mới (rồi nó tự vào mind map)
         skills = ", ".join(f"{n} ({lp})" for lp, n in sorted(UNCLASSIFIED))
         print(f"[build-overstack-docs] ⚠ {len(UNCLASSIFIED)} skill chưa phân nhóm mind map "
@@ -1119,7 +1242,10 @@ def main():
         # nhau theo máy/worktree, nên so nguyên văn làm `--check` đỏ ở MỌI máy không phải máy
         # sinh ra file — gate nói dối theo máy chứ không theo nội dung. Đo 2026-09-07: clone
         # sạch của orca đỏ 1/21 chỉ vì 2 dòng path, nội dung y hệt (diff = 0 sau khi regen).
-        if _strip_selfpath(cur.strip()) != _strip_selfpath(content.strip()):
+        # Cùng lý do, bỏ nội dung iframe memory-map: nó sinh từ dữ liệu phiên LOCAL (gitignored) và
+        # đổi ở mọi lượt có ghi file, nên gate đỏ ở mọi Stop mà regen+commit cũng không xanh bền
+        # (đo 2026-09-11: 3 lần liền trong một phiên). Iframe skill-whiteboard vẫn được so.
+        if _normalize(cur.strip()) != _normalize(content.strip()):
             print("[build-overstack-docs] overstack.html CŨ so với đĩa — chạy lại để cập nhật.", file=sys.stderr)
             sys.exit(2)
         print("overstack.html khớp đĩa ✓")
@@ -1136,6 +1262,15 @@ _FOOT_PATH = re.compile(r'(<div class=(?:"|&quot;)foot(?:"|&quot;)><code>)[^<]*(
 def _strip_selfpath(text: str) -> str:
     """Thay đường dẫn tuyệt đối trong footer bằng placeholder — chỉ dùng để SO SÁNH, không ghi."""
     return _FOOT_PATH.sub(r"\1<SELF-PATH>\2", text)
+
+
+# srcdoc đã escape `"` thành &quot; nên [^"]* dừng đúng ở dấu nháy đóng thuộc tính.
+_MEMMAP = re.compile(r'(<iframe title="Bản đồ trí nhớ"[^>]*?srcdoc=")[^"]*(")')
+
+
+def _normalize(text: str) -> str:
+    """Phần lệch theo MÁY (self-path, memory-map từ dữ liệu phiên local) → placeholder; chỉ để so."""
+    return _MEMMAP.sub(r"\1<MEMORY-MAP>\2", _strip_selfpath(text))
 
 
 def _deliver(out_path, content: str) -> None:

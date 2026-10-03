@@ -15,6 +15,32 @@ import json
 import sys
 from pathlib import Path
 
+for _c in Path(__file__).resolve().parents:
+    if (_c / "harness" / "scripts" / "overstack_paths.py").is_file():
+        sys.path.insert(0, str(_c / "harness" / "scripts"))
+        break
+try:
+    from overstack_paths import harness_dir as _harness_dir
+except Exception:
+    _harness_dir = None
+
+
+
+def _ovs_font(html: str) -> str:
+    """Lớp nền chung của mọi HTML framework sinh ra (font Be Vietnam Pro nhúng + token sáng/tối + nút đổi giao diện) — nguồn: fdk/tools/html_base.py."""
+    import importlib.util
+    from pathlib import Path as _P
+    here = _P(__file__).resolve()
+    for c in (here.with_name("html_font.py"), here.parents[2] / "fdk" / "tools" / "html_font.py", _P.home() / ".claude/harness/fdk/tools/html_font.py"):
+        if c.is_file():
+            s = importlib.util.spec_from_file_location("html_font", c); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+            return m.apply(html)
+    return html
+
+def _metrics_dir(root) -> Path:
+    return (_harness_dir(root) if _harness_dir else Path(root) / "harness") / "metrics"
+
+
 # ENGINE = nơi chứa fdk/tools/*.py (repo-local khi framework; GLOBAL ~/.claude/harness khi downstream).
 # ROOT  = project để đọc metrics + ghi html — ưu tiên cwd (Stop-hook đặt cwd=project root) nên engine
 # global vẫn vẽ ĐÚNG project downstream, không cần copy engine vào từng repo (đối xứng build-wiki-graph).
@@ -54,7 +80,7 @@ def _read(p):
 
 
 def build():
-    scratch = _read("harness/metrics/scratch-log.jsonl")
+    scratch = _read((_metrics_dir(ROOT) / "scratch-log.jsonl").relative_to(ROOT).as_posix())
     ledger = _read("llmwiki/wiki/ledger.jsonl")
     events = _read("harness/metrics/events.jsonl")
 
@@ -101,7 +127,7 @@ def _session_parents() -> dict:
     """{session con: session cha} từ store mem-rank (harness/metrics/memory.jsonl). Fail-open."""
     out = {}
     try:
-        p = Path("harness/metrics/memory.jsonl")
+        p = _metrics_dir(Path.cwd()) / "memory.jsonl"
         for ln in p.read_text(encoding="utf-8").splitlines():
             if not ln.strip():
                 continue
@@ -121,7 +147,7 @@ def main():
         print("memory-map: chưa có dữ liệu (scratch-log/ledger/events trống)")
         return 0
     fn = WG.build_static if "--static" in sys.argv else WG.build_html
-    OUT.write_text(fn("memory", str(OUT), nodes, edges, [], {}), encoding="utf-8")
+    OUT.write_text(_ovs_font(fn("memory", str(OUT), nodes, edges, [], {})), encoding="utf-8")
     n_sess = sum(1 for n in nodes if n["type"] == "session")
     print(f"✓ wrote {OUT.relative_to(ROOT)} — {n_sess} phiên, {len(nodes)-n_sess} file, {len(edges)} cạnh (reuse build-wiki-graph)")
     return 0
