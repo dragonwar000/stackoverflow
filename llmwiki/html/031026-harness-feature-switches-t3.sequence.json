@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T3 — Chuyển các cờ hiện có sang bộ đọc chung",
+    "output": "031026-harness-feature-switches-t3.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "stop", "type": "frontend", "label": "stop.py", "sublabel": "wikigraph · mem-rank"},
+    {"id": "ss", "type": "frontend", "label": "session_start.py", "sublabel": "nhắc wikigraph"},
+    {"id": "ups", "type": "frontend", "label": "prompt_submit.py", "sublabel": "goal hook"},
+    {"id": "fn", "type": "backend", "label": "feature_on", "sublabel": "một cách đọc"},
+    {"id": "env", "type": "external", "label": "Env cũ", "sublabel": "alias giữ nguyên"}
+  ],
+  "messages": [
+    {"id": "t3-m1", "from": "stop", "to": "fn", "y": 160, "label": "wikigraph_on = feature_on(wikigraph)", "variant": "emphasis"},
+    {"id": "t3-m2", "from": "ss", "to": "fn", "y": 194, "label": "nhắc khi cùng công tắc bật", "variant": "emphasis"},
+    {"id": "t3-m3", "from": "ups", "to": "fn", "y": 228, "label": "goal hook theo cùng bộ đọc", "variant": "emphasis"},
+    {"id": "t3-m4", "from": "fn", "to": "env", "y": 262, "label": "OVERSTACK_WIKIGRAPH=1 và =0 vẫn có nghĩa", "variant": "return"},
+    {"id": "t3-m5", "from": "fn", "to": "stop", "y": 296, "label": "stamp có → bật, giữ quy tắc hiện tại", "variant": "default"},
+    {"id": "t3-m6", "from": "fn", "to": "ss", "y": 330, "label": "hai hook dùng cùng một quy tắc", "variant": "security"}
+  ]
+}

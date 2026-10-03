@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T2 — Lệnh feature-switch",
+    "output": "031026-harness-feature-switches-t2.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "dev", "type": "external", "label": "Người dùng", "sublabel": "feature-switch off id"},
+    {"id": "cli", "type": "backend", "label": "feature-switch.py", "sublabel": "list · status · on · off"},
+    {"id": "reg", "type": "database", "label": "features.yaml", "sublabel": "mặc định + guardrail"},
+    {"id": "loc", "type": "database", "label": "features.local.yaml", "sublabel": "ghi giá trị"},
+    {"id": "log", "type": "database", "label": "switch.jsonl", "sublabel": "nhật ký tắt"}
+  ],
+  "messages": [
+    {"id": "t2-m1", "from": "dev", "to": "cli", "y": 160, "label": "off <id>", "variant": "emphasis"},
+    {"id": "t2-m2", "from": "cli", "to": "reg", "y": 194, "label": "đọc mục <id>", "variant": "default"},
+    {"id": "t2-m3", "from": "cli", "to": "dev", "y": 228, "label": "guardrail mà thiếu --acknowledge-guardrail → từ chối", "variant": "security"},
+    {"id": "t2-m4", "from": "cli", "to": "loc", "y": 262, "label": "ghi off, giữ các khoá khác", "variant": "default"},
+    {"id": "t2-m5", "from": "cli", "to": "log", "y": 296, "label": "ghi một dòng nhật ký", "variant": "default"},
+    {"id": "t2-m6", "from": "cli", "to": "dev", "y": 330, "label": "in stderr: đã tắt, tầng nào", "variant": "return"},
+    {"id": "t2-m7", "from": "dev", "to": "cli", "y": 364, "label": "status <id> in giá trị và nguồn", "variant": "return"}
+  ]
+}

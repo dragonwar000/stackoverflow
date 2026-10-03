@@ -5806,3 +5806,8 @@ cc4f999ad |
 - PLAN `wiki/sources/draft/031026-zeromem-parallel-backend-PLAN.md` từ SPEC đã duyệt: 5 task, FR-001..007 đều có task nhận (R7 PASS).
 - Cổng ngược (không chặn): session_end không đọc transcript_path; bnal_config dùng Path(root)/"harness" cứng → PLAN đọc config qua harness_dir; SessionStart dùng subject commit gần nhất làm câu truy vấn; zm thiếu thì backend zeromem rơi về mem-rank.
 - Chưa dispatch, chưa commit.
+
+## 2026-10-03 — propose — harness-feature-switches
+- SPEC `wiki/sources/draft/031026-harness-feature-switches.md` (R7 PASS), companion `llmwiki/html/031026-harness-feature-switches-seq.html` + 4 sơ đồ archify (classic).
+- Khảo sát: hook toàn cục gate bằng stamp, 22 rule không có khoá enabled, 2 config enabled, env rải rác; OVERSTACK_WIKIGRAPH đọc theo hai nghĩa (stop.py:117, session_start.py:289).
+- Đã duyệt 03/10/2026; bàn giao /plan.

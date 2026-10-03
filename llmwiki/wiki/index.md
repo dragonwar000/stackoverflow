@@ -333,3 +333,4 @@
 | [290926-uiux-followups-PLAN](sources/draft/290926-uiux-followups-PLAN.md) | draft | Kế hoạch dọn việc dở sau semantic search: sửa cổng eye-rest báo nhầm chữ trong details đang đóng (có fixture đỏ→xanh), uiux-asset tự nạp chỉ mục tìm kiếm khi deploy, xác nhận CI harness đã xanh nhờ bản sửa upstream, rồi commit/push hai repo |
 | [031026-zeromem-parallel-backend](sources/draft/031026-zeromem-parallel-backend.md) | draft | zeromem song song với mem-rank và memory-map, mặc định zeromem; chờ duyệt |
 | [031026-zeromem-parallel-backend-PLAN](sources/draft/031026-zeromem-parallel-backend-PLAN.md) | draft | PLAN thi hành 5 task (T1 cài zm, T2 bridge, T3 config, T4 hook, T5 memory-map + eval); chưa dispatch |
+| [031026-harness-feature-switches](sources/draft/031026-harness-feature-switches.md) | draft | Công tắc bật/tắt harness: danh mục features.yaml, bộ đọc feature_on, lệnh feature-switch; chờ duyệt |

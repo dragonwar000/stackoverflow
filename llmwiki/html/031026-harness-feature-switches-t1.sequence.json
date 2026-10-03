@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T1 — Danh mục và bộ đọc chung",
+    "output": "031026-harness-feature-switches-t1.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "hook", "type": "frontend", "label": "Hook", "sublabel": "stop · session_start"},
+    {"id": "fn", "type": "backend", "label": "feature_on", "sublabel": "hooklib.py"},
+    {"id": "flag", "type": "external", "label": "Cờ lần chạy", "sublabel": "--feature id=on|off"},
+    {"id": "env", "type": "external", "label": "Biến môi trường", "sublabel": "OVERSTACK_FEATURE_ID"},
+    {"id": "local", "type": "database", "label": "local.yaml", "sublabel": "không commit"},
+    {"id": "repo", "type": "database", "label": "features.yaml", "sublabel": "đã commit"}
+  ],
+  "messages": [
+    {"id": "t1-m1", "from": "hook", "to": "fn", "y": 160, "label": "feature_on(root, id)", "variant": "emphasis"},
+    {"id": "t1-m2", "from": "fn", "to": "flag", "y": 194, "label": "1. cờ lần chạy có không?", "variant": "default"},
+    {"id": "t1-m3", "from": "fn", "to": "env", "y": 228, "label": "2. env OVERSTACK_FEATURE_ID", "variant": "default"},
+    {"id": "t1-m4", "from": "fn", "to": "local", "y": 262, "label": "3. file cục bộ của dự án", "variant": "default"},
+    {"id": "t1-m5", "from": "fn", "to": "repo", "y": 296, "label": "4. file repo, rồi mặc định", "variant": "default"},
+    {"id": "t1-m6", "from": "fn", "to": "hook", "y": 330, "label": "guardrail lỗi đọc → giữ BẬT", "variant": "security"},
+    {"id": "t1-m7", "from": "fn", "to": "hook", "y": 364, "label": "feature lỗi đọc → mặc định, fail-open", "variant": "return"}
+  ]
+}

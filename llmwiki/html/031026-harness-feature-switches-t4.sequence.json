@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T4 — Kiểm thử, tài liệu, đăng ký",
+    "output": "031026-harness-feature-switches-t4.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "ci", "type": "external", "label": "CI", "sublabel": "harness.yml"},
+    {"id": "test", "type": "backend", "label": "switch-test.sh", "sublabel": "ma trận"},
+    {"id": "fn", "type": "backend", "label": "feature_on", "sublabel": "đang kiểm"},
+    {"id": "mech", "type": "database", "label": "mechanisms.yaml", "sublabel": "đăng ký"},
+    {"id": "doc", "type": "database", "label": "concept page", "sublabel": "tài liệu"}
+  ],
+  "messages": [
+    {"id": "t4-m1", "from": "ci", "to": "test", "y": 160, "label": "chạy test công tắc", "variant": "emphasis"},
+    {"id": "t4-m2", "from": "test", "to": "fn", "y": 194, "label": "ma trận thứ tự ưu tiên", "variant": "default"},
+    {"id": "t4-m3", "from": "test", "to": "fn", "y": 228, "label": "guardrail khi lỗi đọc vẫn bật", "variant": "security"},
+    {"id": "t4-m4", "from": "test", "to": "ci", "y": 262, "label": "mọi lần tắt đều có dòng stderr", "variant": "return"},
+    {"id": "t4-m5", "from": "test", "to": "mech", "y": 296, "label": "thêm mục feature-switch", "variant": "emphasis"},
+    {"id": "t4-m6", "from": "test", "to": "doc", "y": 330, "label": "viết trang concept", "variant": "emphasis"}
+  ]
+}
