@@ -42,6 +42,10 @@
 | [sql-active-users](sources/evals/sql-active-users.md) | eval | Golden: SQL active users |
 | [context-guard-cache-read](sources/evals/context-guard-cache-read.md) | eval | Golden: gác đầy context phải đo input + cache_read + cache_creation của lượt cuối |
 | [hook-gate-consistency](sources/evals/hook-gate-consistency.md) | eval | Golden: SessionStart thoát trước recall() khi thiếu manifest — GH#151 |
+| [feature-switch-guardrail-off](sources/evals/feature-switch-guardrail-off.md) | eval | Golden: guardrail chỉ tắt được qua file cục bộ có --acknowledge-guardrail, env bị bỏ qua |
+| [feature-switch-wikigraph-memory](sources/evals/feature-switch-wikigraph-memory.md) | eval | Golden: tắt wikigraph tắt vẽ graph, bộ nhớ thứ cấp vẫn chạy theo stamp |
+| [zeromem-backend-fallback](sources/evals/zeromem-backend-fallback.md) | eval | Golden: memory.backend mặc định zeromem, thiếu zm thì rơi về mem-rank |
+| [zeromem-session-end-write](sources/evals/zeromem-session-end-write.md) | eval | Golden: session_end.py ghi zeromem bằng subprocess.run vì không có _run của Stop |
 | [r3-index-sync-gate](sources/evals/r3-index-sync-gate.md) | eval | Golden: draft quên dòng index bị chặn ở pre-commit wiki-index-sync — GH#150 |
 | [teach-me-engineer-wikieval](sources/evals/teach-me-engineer-wikieval.md) | eval | Golden: teach-me cho engineer — bảy phần đúng thứ tự, sơ đồ, bằng chứng runtime |
 | [teach-me-manager-syncskill](sources/evals/teach-me-manager-syncskill.md) | eval | Golden: teach-me cho manager — không code/backtick, nói bằng rủi ro, chốt đề xuất |
