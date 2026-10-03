@@ -236,7 +236,7 @@
   <section class="task" id="t2" aria-labelledby="h-t2">
     <h2 id="h-t2"><span class="kicker">T2</span>Lệnh feature-switch</h2>
     <p class="desc">Lệnh `harness/scripts/feature-switch.py` cho người dùng bật và tắt công tắc bằng một dòng lệnh. `list` in toàn bộ danh mục. `status <id>` in giá trị hiệu lực và tầng nguồn của nó, để người dùng biết vì sao một công tắc đang ở trạng thái đó. `on` và `off` ghi vào file cục bộ, và không đụng file đã commit, nên thay đổi chỉ ảnh hưởng dự án đang làm.</p>
-    <p class="desc">Tắt một guardrail đòi hỏi cờ `--acknowledge-guardrail`. Thiếu cờ thì lệnh từ chối và không ghi gì. Đây là chỗ người dùng phải nói rõ là họ hiểu rủi ro. Mọi lần tắt, kể cả feature thường, đều được ghi một dòng vào `harness/metrics/feature-switch.jsonl`, và in một dòng ra stderr nêu chức năng và tầng đã tắt nó.</p>
+    <p class="desc">Tắt một guardrail đòi hỏi cờ `--acknowledge-guardrail`. Thiếu cờ thì lệnh từ chối và không ghi gì. Đây là chỗ người dùng phải nói rõ là họ hiểu rủi ro. Lớp gate (R2, R3, R7, R9, R18, R19, R20, R22) tắt được qua biến môi trường hoặc config như cũ, không cần cờ xác nhận, nhưng phải in stderr. Mọi lần tắt, kể cả feature thường, đều được ghi một dòng vào `harness/metrics/feature-switch.jsonl`, và in một dòng ra stderr nêu chức năng và tầng đã tắt nó.</p>
     <div class="embed">
       <iframe class="archify-embed" src="031026-harness-feature-switches-t2.html" title="T2 · Lệnh" loading="lazy"></iframe>
     </div>
