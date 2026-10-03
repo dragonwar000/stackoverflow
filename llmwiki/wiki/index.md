@@ -334,3 +334,4 @@
 | [031026-zeromem-parallel-backend](sources/draft/031026-zeromem-parallel-backend.md) | draft | zeromem song song với mem-rank và memory-map, mặc định zeromem; chờ duyệt |
 | [031026-zeromem-parallel-backend-PLAN](sources/draft/031026-zeromem-parallel-backend-PLAN.md) | draft | PLAN thi hành 5 task (T1 cài zm, T2 bridge, T3 config, T4 hook, T5 memory-map + eval); chưa dispatch |
 | [031026-harness-feature-switches](sources/draft/031026-harness-feature-switches.md) | draft | Công tắc bật/tắt harness: danh mục features.yaml, bộ đọc feature_on, lệnh feature-switch; chờ duyệt |
+| [031026-session-provenance](sources/provenance/031026-session-provenance.md) | source | Auto-distill scratch-log phiên 2a40433d: ghi nhận việc cài và ghim zeromem (cài zm, kiểm sha256 model theo lock), chỉ chạm `ledger.jsonl` |
