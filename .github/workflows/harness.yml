@@ -245,6 +245,8 @@ jobs:
         run: bash harness/tests/evidence-terminal-test.sh .
       - name: feature-switch — ma trận feature_on (thứ tự ưu tiên, guardrail fail-closed)
         run: bash harness/tests/feature-switch-test.sh .
+      - name: feature-switch CLI — list/status/on/off, ack guardrail, từ chối công tắc chưa gắn
+        run: bash harness/tests/feature-switch-cli-test.sh .
       - name: anti-idle — provider cắt lượt bằng refusal rỗng thì Stop hook chặn dừng
         run: bash harness/tests/anti-idle-stop-test.sh .
       - name: token-attrib — quy trách nhiệm token theo nguồn bơm (khuếch đại token·lượt)
