@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "note": "Golden cross-session: câu hỏi thuộc phiên A, truy vấn từ phiên B. Hit@k đo trên zeromem thật (ZEROMEM_E2E=1); CI chỉ kiểm harness bằng fake zm.",
+  "query_session": "B",
+  "sessions": {
+    "A": ["Carrie lo sach ban sci-fi tu Ingram", "Dung Books mo o Jersey City"],
+    "B": ["sua hook stop cho dung budget"]
+  },
+  "cases": [
+    {"id": "xc-1", "query": "ai lo mang sach sci-fi", "expect_session": "A", "k": 3},
+    {"id": "xc-2", "query": "cua hang Dung Books mo o dau", "expect_session": "A", "k": 3}
+  ]
+}

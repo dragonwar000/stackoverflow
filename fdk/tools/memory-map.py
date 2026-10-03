@@ -9,9 +9,11 @@ session → file đã chạm; why (context vụn) hiện ở tooltip node sessio
 CLI:
   memory-map.py            # ghi llmwiki/html/memory-map.html (JS đồ thị)
   memory-map.py --static   # bản HTML thuần 0-JS
+  memory-map.py --source zeromem   # ghi memory-map-zeromem.html cạnh memory-map.html, chỉ ĐỌC zeromem.db
 """
 import importlib.util
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -123,6 +125,46 @@ def build():
     return nodes, edges
 
 
+def _zeromem_sessions(root):
+    """Phiên và số turn từ zeromem.db, chỉ đọc. None khi chưa có store. Lỗi schema → RuntimeError."""
+    zb = _load(Path("harness") / "scripts" / "zeromem-bridge.py", "zb")
+    db = zb.store_home(str(root)) / "zeromem.db"
+    if not db.is_file():
+        return None
+    con = sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True)
+    try:
+        cols = {r[1] for r in con.execute("PRAGMA table_info(turns)")}
+        need = {"session_id", "session_turn", "speaker", "text", "ts"}
+        if not need <= cols:
+            raise RuntimeError(f"schema zeromem lạ: thiếu {sorted(need - cols)}")
+        return con.execute(
+            "SELECT session_id, MIN(ts), COUNT(*), MAX(ts) FROM turns GROUP BY session_id ORDER BY MIN(ts)"
+        ).fetchall()
+    finally:
+        con.close()
+
+
+def _main_zeromem():
+    try:
+        rows = _zeromem_sessions(ROOT)
+    except (RuntimeError, sqlite3.Error) as e:
+        print(f"memory-map --source zeromem: {e}", file=sys.stderr)
+        return 1
+    if rows is None:
+        print("memory-map --source zeromem: chưa có zeromem.db của project này")
+        return 0
+    # Chỉ id, số turn, mốc thời gian. Không đọc cột text: nội dung turn không đi vào đồ thị.
+    nodes = [{"id": f"s:{sid[:8]}", "path": f"session/{sid[:8]}", "group": "session", "type": "session",
+              "title": f"{n} turn · {sid[:8]}", "wiki": "memory", "label": sid[:8]}
+             for sid, _ts0, n, _ts1 in rows]
+    out = ROOT / "llmwiki" / "html" / "memory-map-zeromem.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fn = WG.build_static if "--static" in sys.argv else WG.build_html
+    out.write_text(_ovs_font(fn("memory", str(out), nodes, [], [], {})), encoding="utf-8")
+    print(f"✓ wrote {out.relative_to(ROOT)} — {len(nodes)} phiên (zeromem, chỉ đọc)")
+    return 0
+
+
 def _session_parents() -> dict:
     """{session con: session cha} từ store mem-rank (harness/metrics/memory.jsonl). Fail-open."""
     out = {}
@@ -142,6 +184,8 @@ def _session_parents() -> dict:
 
 
 def main():
+    if "--source" in sys.argv and sys.argv[sys.argv.index("--source") + 1:][:1] == ["zeromem"]:
+        return _main_zeromem()
     nodes, edges = build()
     if not nodes:
         print("memory-map: chưa có dữ liệu (scratch-log/ledger/events trống)")

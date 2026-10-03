@@ -36,6 +36,10 @@ jobs:
         run: bash harness/tests/zeromem-bridge-test.sh .
       - name: zeromem-hooks — SessionStart recall zeromem, mem-rank không đổi (fake zm)
         run: bash harness/tests/zeromem-hooks-test.sh .
+      - name: zeromem-memory-map — --source zeromem chỉ đọc, schema lạ báo lỗi
+        run: bash harness/tests/zeromem-memory-map-test.sh .
+      - name: zeromem-eval — harness hit@k cross-session (fake zm)
+        run: bash harness/tests/zeromem-eval-test.sh .
 
   validate-content:
     name: validate file .md đổi (layer=repo)
