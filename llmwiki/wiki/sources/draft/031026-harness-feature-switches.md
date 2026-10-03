@@ -40,7 +40,7 @@ Vậy có sẵn một danh mục (`mechanisms.yaml`) và một mẫu công tắc
 - Mọi chức năng mặc định giữ đúng hành vi hiện tại. Không đổi giá trị mặc định của bất kỳ công tắc nào trong phạm vi này.
 - Hook là fail-open: lỗi đọc công tắc không được chặn phiên làm việc. Ngoại lệ là guardrail (xem FR-004): lỗi đọc công tắc guardrail phải giữ guardrail BẬT.
 - Mọi lần tắt một chức năng phải in một dòng ra stderr nêu rõ chức năng và tầng đã tắt nó.
-- Không xoá rule nào khỏi `harness/policy.yaml`. Rule là bất biến. Đề xuất này chỉ thêm đường tắt có kiểm soát cho chức năng, không cho rule.
+- Không xoá rule nào khỏi `harness/poc-vendor-neutral/policy.yaml`. Rule là bất biến. Đề xuất này chỉ thêm đường tắt có kiểm soát cho chức năng, không cho rule.
 - Đường dẫn trong script mới phải dùng `overstack_paths.*` hoặc `hooklib.*`. Không ghi cứng `llmwiki/` hoặc `harness/` (lint `bare_path_lint.py`).
 - Không dùng `git add -A` hoặc `git add .`. Stage theo danh sách file cụ thể (hook `P1 no-bulk-stage`).
 - Trên Windows, Python chạy với `PYTHONUTF8=1`.
@@ -68,7 +68,7 @@ Chọn A vì nó sửa đúng chỗ bị lệch (hai nghĩa của một cờ, v�
 
 - [ ] **T1: danh mục và bộ đọc chung.** Tạo `harness/features.yaml` liệt kê mọi công tắc hiện có, kèm lớp `switch`, và thêm `feature_on(root, id)` vào `llmwiki/.claude/hooks/hooklib.py`. Thứ tự ưu tiên và quy tắc fail-closed của lớp `guardrail` được cài đặt ở đây.
 - [ ] **T2: lệnh `feature-switch`.** Tạo `harness/scripts/feature-switch.py` với các lệnh `list`, `status <id>`, `on <id>`, `off <id>`. Lệnh `status` in giá trị hiệu lực và tầng nguồn của nó. Lệnh `off` với guardrail phải có cờ `--acknowledge-guardrail`, và mọi lần tắt đều được ghi vào `harness/metrics/feature-switch.jsonl`.
-- [ ] **T3: chuyển các cờ hiện có sang bộ đọc chung.** Sửa `stop.py`, `session_start.py`, `user_prompt_submit.py`, `hooklib.py` và hai config có `enabled:` để đọc qua `feature_on`. Đồng thời giải quyết hai nghĩa của `OVERSTACK_WIKIGRAPH` bằng một quy tắc duy nhất, giữ giá trị mặc định hiện tại.
+- [ ] **T3: chuyển các cờ hiện có sang bộ đọc chung.** Sửa `stop.py`, `session_start.py`, `user_prompt_submit.py`, `hooklib.py` và hai config có `enabled:` để đọc qua `feature_on`. Thêm trường `switch` vào mọi rule của `harness/poc-vendor-neutral/policy.yaml`. Thêm test FR-010 so sánh hai copy `evidence_terminal.py`. Đồng thời giải quyết hai nghĩa của `OVERSTACK_WIKIGRAPH` bằng một quy tắc duy nhất, giữ giá trị mặc định hiện tại.
 - [ ] **T4: kiểm thử, tài liệu, và đăng ký.** Thêm `harness/tests/feature-switch-test.sh` kiểm ma trận thứ tự ưu tiên, guardrail fail-closed, và dòng stderr khi tắt. Đăng ký mục mới vào `harness/mechanisms.yaml` và viết trang concept `feature-switches`.
 
 ## Requirements (FR)
@@ -81,7 +81,8 @@ Chọn A vì nó sửa đúng chỗ bị lệch (hai nghĩa của một cờ, v�
 - **FR-006**: Các biến môi trường cũ (`OVERSTACK_EVIDENCE_TERMINAL`, `OVERSTACK_GOAL_HOOK`, `OVERSTACK_WIKIGRAPH`) PHẢI tiếp tục có hiệu lực như trước.
 - **FR-007**: Lệnh `status` PHẢI in giá trị hiệu lực và tầng nguồn của giá trị đó.
 - **FR-008**: Lớp `gate` (R2, R3, R7, R9, R18, R19, R20, R22 và các rule khác được phân lớp `gate`) PHẢI giữ đường tắt bằng biến môi trường và config như hôm nay. Mỗi lần tắt PHẢI in stderr và ghi một dòng vào `harness/metrics/feature-switch.jsonl`. Không cần cờ xác nhận.
-- **FR-009**: Mỗi rule trong `harness/policy.yaml` PHẢI khai trường `switch` nhận đúng một trong ba giá trị `guardrail`, `gate`, `feature`.
+- **FR-009**: Mỗi rule trong `harness/poc-vendor-neutral/policy.yaml` (nguồn chạy thật của runtime và lint) PHẢI khai trường `switch` nhận đúng một trong ba giá trị `guardrail`, `gate`, `feature`. File `harness/policy.yaml` (dạng danh sách) không phải nguồn chạy và không bắt buộc khai trường này.
+- **FR-010**: Hai copy `evidence_terminal.py` (`harness/validators/` và `llmwiki/.claude/hooks/validators/`) PHẢI giống hệt nhau từng byte. Một test PHẢI so sánh hai copy và đỏ khi lệch. Không xoá copy nào, vì mỗi copy phục vụ một đường nạp khác nhau (`find_validators` và `harness-doctor.py`).
 
 ## Success criteria (SC)
 
@@ -89,13 +90,14 @@ Chọn A vì nó sửa đúng chỗ bị lệch (hai nghĩa của một cờ, v�
 - **SC-002**: Không có hành vi mặc định nào đổi sau migrate. Đo bằng toàn bộ test hiện có của harness đều vẫn xanh.
 - **SC-003**: Không có lần tắt nào im lặng. Mỗi lần tắt đều có một dòng stderr, kiểm bằng test.
 - **SC-004**: Không có guardrail nào tắt được mà không có cờ xác nhận. Kiểm bằng test ma trận.
-- **SC-005**: Mọi rule trong `harness/policy.yaml` đều có trường `switch` hợp lệ. Kiểm bằng test đọc policy.
+- **SC-005**: Mọi rule trong `harness/poc-vendor-neutral/policy.yaml` đều có trường `switch` hợp lệ. Kiểm bằng test đọc policy.
 
 ## Assumptions
 
 - Phân lớp (default, người duyệt đã chấp thuận 03/10/2026, R1 và R14 xác nhận là `guardrail`): `guardrail` = R1 no-write-raw, R14 patterns-protected, `egress-guard`, `inject-scan`, `orca_guard`. `gate` = R2, R3, R7, R9, R18, R19, R20, R22, và các rule còn lại đánh dấu `gate` trong bước T3. `feature` = orientation, wiki-graph, goal-hook, agent-trace, self-report.
 - R19 là `gate`, không phải `guardrail`: nó kiểm chất lượng nội dung tài liệu, không phải nền tảng bảo mật. Tắt R19 bằng `OVERSTACK_EVIDENCE_TERMINAL=0` hoặc `enabled: false` vẫn được giữ (FR-008) và phải ghi stderr và nhật ký.
 - `evidence_leaf.py` là engine dùng chung với `grounding-check.py`. Công tắc chỉ tắt cổng R19, không tắt engine.
+- Hai file policy có cùng 22 id nhưng trường `statement` lệch ở 20 rule. Đây là drift có sẵn, không do công việc này gây ra, và được tách thành việc riêng ngoài SPEC này.
 - File công tắc cục bộ là `.llmwiki/features.local.yaml`, không commit, đặt trong thư mục overstack của dự án (default).
 - Cờ lần chạy là tham số `--feature <id>=<on|off>` của script chạy hook, chỉ có hiệu lực trong một lần chạy (default).
 - Các biến `OVERSTACK_EVIDENCE_TERMINAL`, `OVERSTACK_GOAL_HOOK`, `OVERSTACK_WIKIGRAPH` được giữ làm alias của công tắc tương ứng. Giá trị mặc định là giá trị hiện tại trong code (default).
