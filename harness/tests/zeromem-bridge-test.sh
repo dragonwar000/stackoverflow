@@ -50,6 +50,9 @@ mkcfg 'memory:
   backend: zeromem
 '
 [ "$(ZEROMEM_ZM=/does/not/exist PATH=/usr/bin:/bin python3 "$BRIDGE" backend --root "$TMP/cfg" 2>/dev/null)" = "mem-rank" ] && ok "zeromem không có zm → rơi về mem-rank" || bad "fallback zm" "không khớp"
+printf 'memory:\n  backend: both\n' > "$TMP/cfg/harness/mem-rank.config.yaml"
+out=$(ZEROMEM_ZM=/does/not/exist PATH=/usr/bin:/bin python3 "$BRIDGE" backend --root "$TMP/cfg" 2>"$TMP/both.err")
+[ "$out" = "mem-rank" ] && grep -q 'backend=both' "$TMP/both.err" && ok "both không có zm → mem-rank, có cảnh báo stderr" || bad "fallback both" "out=$out"
 
 echo "zeromem-bridge-test: $pass pass, $fail fail"
 [ $fail -eq 0 ] && echo "PASS" || exit 1

@@ -128,7 +128,8 @@ def ingest(root: str, transcript: str, session_id: str) -> int:
 def memory_backend(root: str) -> str:
     """Đọc `memory.backend` từ harness/mem-rank.config.yaml qua harness_dir. Mặc định zeromem.
 
-    Thiếu binary zm → mem-rank (không mất ghi). Giá trị lạ → `invalid:<giá trị>`, hook sẽ báo và giữ mem-rank.
+    Thiếu binary zm → mem-rank (không mất ghi), cả khi khai zeromem lẫn both. Giá trị lạ → `invalid:<giá trị>`,
+    hook sẽ báo và giữ mem-rank.
     """
     cfg = harness_dir(root) / "mem-rank.config.yaml"
     try:
@@ -139,8 +140,8 @@ def memory_backend(root: str) -> str:
     val = m.group(1) if m else DEFAULT_BACKEND
     if val not in VALID_BACKENDS:
         return f"invalid:{val}"
-    if val == "zeromem" and not zm_bin():
-        print("zeromem-bridge: backend=zeromem nhưng không có zm — tạm dùng mem-rank", file=sys.stderr)
+    if val in ("zeromem", "both") and not zm_bin():
+        print(f"zeromem-bridge: backend={val} nhưng không có zm — tạm dùng mem-rank", file=sys.stderr)
         return "mem-rank"
     return val
 
