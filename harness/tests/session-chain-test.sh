@@ -12,7 +12,8 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/.llmwiki/wiki" "$TMP/harness/metrics" "$TMP/.claude"
 cp -R "$ROOT/llmwiki/.claude/hooks" "$TMP/.claude/hooks"; cp -R "$ROOT/harness/scripts" "$TMP/harness/scripts"
 cp "$ROOT/.template-manifest.json" "$TMP/" 2>/dev/null || echo '{}' > "$TMP/.template-manifest.json"
-printf 'verified: false\n' > "$TMP/harness/mem-rank.config.yaml"
+# Test này khoá chuỗi mem-rank: ghim backend mem-rank, nếu không máy có zm sẽ lấy mặc định zeromem và SessionStart bỏ qua chuỗi.
+printf 'verified: false\nmemory:\n  backend: mem-rank\n' > "$TMP/harness/mem-rank.config.yaml"
 git -C "$TMP" -c init.defaultBranch=main init -q
 ep(){ (cd "$TMP/harness/scripts" && python3 mem-rank.py episode "$1" --files "$2" --session "$3" --parent auto --root "$TMP") >/dev/null 2>&1; }
 ep "dựng validator R20" "harness/validators/r20.py" sessA
