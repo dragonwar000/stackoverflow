@@ -1,13 +1,65 @@
 {
   "schema": 1,
-  "note": "Golden cross-session: câu hỏi thuộc phiên A, truy vấn từ phiên B. Hit@k đo trên zeromem thật (ZEROMEM_E2E=1); CI chỉ kiểm harness bằng fake zm.",
+  "note": "Golden cross-session: truy vấn từ phiên B, bằng chứng nằm ở phiên khác. Có ba phiên nhiễu (C, D, E) và k=1, nên HIT đòi zm xếp đúng phiên lên đầu. Hit@k đo trên zeromem thật (ZEROMEM_E2E=1); CI chỉ kiểm harness bằng fake zm.",
   "query_session": "B",
   "sessions": {
-    "A": ["Carrie lo sach ban sci-fi tu Ingram", "Dung Books mo o Jersey City"],
-    "B": ["sua hook stop cho dung budget"]
+    "A": [
+      "Carrie lo sach ban sci-fi tu Ingram",
+      "Dung Books mo o Jersey City"
+    ],
+    "B": [
+      "sua hook stop cho dung budget",
+      "hook stop chay qua ngan sach hai muoi giay"
+    ],
+    "C": [
+      "Minh phu trach hoa don dien thang muoi",
+      "may in van phong hong truc cuon giay"
+    ],
+    "D": [
+      "lich bao tri may chu chuyen sang thu bay",
+      "backup co so du lieu chay luc hai gio sang"
+    ],
+    "E": [
+      "doi bong cong ty tap chieu thu tu",
+      "dat san bong o quan Tan Binh"
+    ]
   },
   "cases": [
-    {"id": "xc-1", "query": "ai lo mang sach sci-fi", "expect_session": "A", "k": 3},
-    {"id": "xc-2", "query": "cua hang Dung Books mo o dau", "expect_session": "A", "k": 3}
+    {
+      "id": "xc-1",
+      "query": "ai lo mang sach sci-fi",
+      "expect_session": "A",
+      "k": 1
+    },
+    {
+      "id": "xc-2",
+      "query": "cua hang Dung Books mo o dau",
+      "expect_session": "A",
+      "k": 1
+    },
+    {
+      "id": "xc-3",
+      "query": "ai phu trach hoa don dien",
+      "expect_session": "C",
+      "k": 1
+    },
+    {
+      "id": "xc-4",
+      "query": "backup co so du lieu chay luc may gio",
+      "expect_session": "D",
+      "k": 1
+    },
+    {
+      "id": "xc-5",
+      "query": "doi bong tap vao thu may",
+      "expect_session": "E",
+      "k": 1
+    },
+    {
+      "id": "xc-6",
+      "query": "sua hook stop cho dung budget",
+      "forbid_session": "B",
+      "k": 3
+    }
   ]
 }

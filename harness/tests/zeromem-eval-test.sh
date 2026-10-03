@@ -51,7 +51,9 @@ for case in g["cases"]:
     out = subprocess.run([sys.executable, bridge, "recall", "--root", root, "--query", case["query"],
                           "--exclude-session", g["query_session"], "--top-k", str(case["k"])],
                          capture_output=True, text=True).stdout.splitlines()
-    if mode == "real":   # đo thật: phải có evidence của đúng phiên mong đợi trong top-k
+    if "forbid_session" in case:   # phiên đang hỏi không được tự nhớ lại chính nó (cả fake lẫn real)
+        ok = not any(ln.startswith(f"- [{case['forbid_session']}] ") for ln in out)
+    elif mode == "real":   # đo thật: phải có evidence của đúng phiên mong đợi trong top-k
         ok = any(ln.startswith(f"- [{case['expect_session']}] ") for ln in out)
     else:                # fake: chỉ kiểm bridge trả đúng định dạng dòng evidence, KHÔNG kiểm chất lượng
         ok = any(re.match(r"- \[[^\]]+\] ", ln) for ln in out)

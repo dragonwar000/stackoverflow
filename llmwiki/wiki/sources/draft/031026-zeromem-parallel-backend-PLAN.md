@@ -1115,3 +1115,8 @@ git commit -m "feat(zeromem): memory-map --source zeromem chỉ đọc và eval 
   5. T5, memory-map: bỏ cạnh `continues`, test chạy trong project tạm, thêm ca "không ghi đè `memory-map.html`" và kiểm rc khi schema lạ, tổng 4 ca.
   6. T5, eval: bản cũ ở chế độ `real` chỉ kiểm output không rỗng, không seed và không đọc `expect_session`. Bản mới seed vào store tạm và kiểm `expect_session`; golden thêm `query_session`.
   7. Hệ quả ngoài hai task: `harness/tests/session-chain-test.sh` ghim `memory.backend: mem-rank` trong fixture (commit `e35613f3`), vì backend mặc định `zeromem` làm SessionStart bỏ qua chuỗi mem-rank trên máy có `zm`.
+- **PLAN v2.2 (03/10/2026).** Làm cứng golden eval của T5, ngoài năm task. Khối golden và khối `zeromem-eval-test.sh` trong Task 5 là bản ở `e4a9a48b`; bản hiện hành nằm trong repo.
+  - `harness/evals/zeromem-cross-session.json`: thêm ba phiên nhiễu (C, D, E), năm ca `k=1` trỏ tới ba phiên khác nhau, và một ca `forbid_session` kiểm phiên đang hỏi không tự nhớ lại chính nó.
+  - `harness/tests/zeromem-eval-test.sh`: hiểu `forbid_session`.
+  - Số đo thật (`ZEROMEM_E2E=1`, zm 0.3.0 trên máy dev, embedder `bge-small-en-v1.5` thật, không phải fallback, store tạm 10 turn): `HITRATE 6/6`. Giới hạn "truy vấn nào cũng HIT" của v2.1 không còn. Golden vẫn nhỏ (10 turn, câu hỏi gần nguyên văn), nên đây là kiểm khói cho xếp hạng, chưa phải benchmark.
+
