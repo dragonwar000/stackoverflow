@@ -226,3 +226,9 @@ mechanisms:
     live_probe: fdk/tools/skill-reuse.py
     anchor_symbol: "setup::fdk/tools/skill-reuse.py::render"
     confirmed: "2026-09-19"
+  - id: feature-switch
+    name: feature-switch
+    kind: tool
+    surface: [mechanism]
+    desc: "Công tắc bật/tắt harness: danh mục harness/features.yaml, đọc qua hooklib.feature_on. feature-switch off ghi features.local.yaml (cục bộ, không commit); guardrail tắt cần --acknowledge-guardrail và chỉ tắt được qua file cục bộ; mỗi lần tắt tường minh in một dòng stderr; lần tắt qua CLI ghi harness/metrics/feature-switch.jsonl. agent-trace bật/tắt qua agent-trace.py."
+    live_probe: harness/scripts/feature-switch.py

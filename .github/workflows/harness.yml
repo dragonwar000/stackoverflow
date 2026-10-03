@@ -40,6 +40,8 @@ jobs:
         run: bash harness/tests/zeromem-memory-map-test.sh .
       - name: zeromem-eval — harness hit@k cross-session (fake zm)
         run: bash harness/tests/zeromem-eval-test.sh .
+      - name: feature-switch — hai copy evidence_terminal giống hệt, policy có switch hợp lệ, guardrail khớp registry
+        run: bash harness/tests/feature-switch-consistency-test.sh .
 
   validate-content:
     name: validate file .md đổi (layer=repo)
