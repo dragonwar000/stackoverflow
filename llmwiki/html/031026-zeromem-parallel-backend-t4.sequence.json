@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T4 — Nối ghi ở Stop và đọc ở SessionStart",
+    "output": "031026-zeromem-parallel-backend-t4.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "claude", "type": "external", "label": "Claude Code", "sublabel": "phát sự kiện"},
+    {"id": "stop", "type": "frontend", "label": "stop.py", "sublabel": "Stop · SessionEnd"},
+    {"id": "start", "type": "frontend", "label": "session_start.py", "sublabel": "SessionStart"},
+    {"id": "zmhook", "type": "backend", "label": "zm hook", "sublabel": "đọc transcript_path"},
+    {"id": "store", "type": "database", "label": "zeromem.db", "sublabel": "ZEROMEM_HOME của project"}
+  ],
+  "messages": [
+    {"id": "t4-m1", "from": "claude", "to": "stop", "y": 160, "label": "Stop: session_id, transcript_path", "variant": "default"},
+    {"id": "t4-m2", "from": "stop", "to": "zmhook", "y": 194, "label": "ZEROMEM_HOME=store project, zm hook", "variant": "emphasis"},
+    {"id": "t4-m3", "from": "zmhook", "to": "store", "y": 228, "label": "spool: người dùng + assistant cuối", "variant": "security"},
+    {"id": "t4-m4", "from": "claude", "to": "start", "y": 262, "label": "SessionStart: phiên mới", "variant": "default"},
+    {"id": "t4-m5", "from": "start", "to": "claude", "y": 296, "label": "recall qua bridge, tối đa 3 dòng", "variant": "return"},
+    {"id": "t4-m6", "from": "stop", "to": "claude", "y": 330, "label": "mem-rank chạy song song khi backend both", "variant": "return"}
+  ]
+}

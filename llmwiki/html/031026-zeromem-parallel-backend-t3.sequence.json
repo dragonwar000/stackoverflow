@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T3 — Chọn backend bằng config",
+    "output": "031026-zeromem-parallel-backend-t3.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "dev", "type": "external", "label": "Người dùng", "sublabel": "đặt memory.backend"},
+    {"id": "cfg", "type": "database", "label": "memory config", "sublabel": "backend: zeromem"},
+    {"id": "hook", "type": "frontend", "label": "Hook", "sublabel": "Stop · SessionStart"},
+    {"id": "dispatch", "type": "backend", "label": "Bộ chọn backend", "sublabel": "đọc một lần"},
+    {"id": "mem", "type": "backend", "label": "mem-rank (cũ)", "sublabel": "giữ nguyên"},
+    {"id": "zm", "type": "backend", "label": "zeromem", "sublabel": "bridge"}
+  ],
+  "messages": [
+    {"id": "t3-m1", "from": "dev", "to": "cfg", "y": 160, "label": "đặt backend: mem-rank | zeromem | both", "variant": "emphasis"},
+    {"id": "t3-m2", "from": "hook", "to": "dispatch", "y": 194, "label": "hỏi backend lúc khởi động", "variant": "default"},
+    {"id": "t3-m3", "from": "cfg", "to": "dispatch", "y": 228, "label": "thiếu khoá → mặc định zeromem", "variant": "default"},
+    {"id": "t3-m4", "from": "dispatch", "to": "zm", "y": 262, "label": "zeromem hoặc both → nhánh zeromem", "variant": "emphasis"},
+    {"id": "t3-m5", "from": "dispatch", "to": "mem", "y": 296, "label": "mem-rank hoặc both → nhánh cũ", "variant": "return"},
+    {"id": "t3-m6", "from": "dispatch", "to": "hook", "y": 330, "label": "giá trị lạ → báo lỗi, không đoán", "variant": "security"}
+  ]
+}

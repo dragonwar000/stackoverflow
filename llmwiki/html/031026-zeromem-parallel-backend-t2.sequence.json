@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T2 — Bridge zeromem-bridge.py",
+    "output": "031026-zeromem-parallel-backend-t2.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "hook", "type": "frontend", "label": "Hook", "sublabel": "stop.py / session_start.py"},
+    {"id": "bridge", "type": "backend", "label": "zeromem-bridge.py", "sublabel": "recall · forget · stats"},
+    {"id": "zm", "type": "backend", "label": "zm mcp", "sublabel": "JSON-RPC stdio"},
+    {"id": "store", "type": "database", "label": "zeromem.db", "sublabel": "store của project"}
+  ],
+  "messages": [
+    {"id": "t2-m1", "from": "hook", "to": "bridge", "y": 160, "label": "recall(câu hỏi, exclude_session)", "variant": "emphasis"},
+    {"id": "t2-m2", "from": "bridge", "to": "zm", "y": 194, "label": "spawn zm mcp --home, initialize", "variant": "default"},
+    {"id": "t2-m3", "from": "zm", "to": "store", "y": 228, "label": "nạp spool rồi tìm BM25 + dense", "variant": "default"},
+    {"id": "t2-m4", "from": "store", "to": "zm", "y": 262, "label": "turn đã lọc", "variant": "return"},
+    {"id": "t2-m5", "from": "zm", "to": "bridge", "y": 296, "label": "tools/call trả JSON", "variant": "return"},
+    {"id": "t2-m6", "from": "bridge", "to": "hook", "y": 330, "label": "tối đa 3 dòng, loại phiên hiện tại", "variant": "security"},
+    {"id": "t2-m7", "from": "bridge", "to": "hook", "y": 364, "label": "lỗi zm → rỗng, không chặn phiên", "variant": "return"}
+  ]
+}

@@ -5796,3 +5796,13 @@ cc4f999ad |
 - 030726-multi-session-add-guard (ledger-only): luật pathspec tường minh trong /fdk + CLAUDE/AGENT; rule dự án P1 `no-bulk-stage` (harness-local) + test 2 phiên + firedrill → done.
 - 150726-legacy-html-slop-debt (ledger-only, draft mất 2 lần): đếm lại bằng frontend-antipattern 0/18 file → tạo lại draft, done.
 - Kèm draft chờ duyệt `011026-theme-toggle-neumorphism` (chuẩn nút sáng/tối mới) để không mất như draft chưa commit trước đây.
+
+## 2026-10-03 — propose — zeromem-parallel-backend
+- Draft `wiki/sources/draft/031026-zeromem-parallel-backend.md` (R7 PASS) + companion `llmwiki/html/031026-zeromem-parallel-backend-seq.html` và 5 sơ đồ archify (T1–T5, preset classic).
+- Đã cài zm (`eda212665`) và model bge-small (sha256 khớp lock) trên máy này; mặc định backend = zeromem.
+- Chưa commit, chờ duyệt.
+
+## 2026-10-03 — plan — zeromem-parallel-backend
+- PLAN `wiki/sources/draft/031026-zeromem-parallel-backend-PLAN.md` từ SPEC đã duyệt: 5 task, FR-001..007 đều có task nhận (R7 PASS).
+- Cổng ngược (không chặn): session_end không đọc transcript_path; bnal_config dùng Path(root)/"harness" cứng → PLAN đọc config qua harness_dir; SessionStart dùng subject commit gần nhất làm câu truy vấn; zm thiếu thì backend zeromem rơi về mem-rank.
+- Chưa dispatch, chưa commit.

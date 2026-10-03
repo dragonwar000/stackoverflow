@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T5 — memory-map đọc zeromem và eval golden",
+    "output": "031026-zeromem-parallel-backend-t5.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "mm", "type": "backend", "label": "memory-map.py", "sublabel": "--source"},
+    {"id": "mem", "type": "database", "label": "memory.jsonl", "sublabel": "nguồn mặc định"},
+    {"id": "store", "type": "database", "label": "zeromem.db", "sublabel": "chỉ đọc, pin schema"},
+    {"id": "html", "type": "frontend", "label": "memory-map.html", "sublabel": "graph"},
+    {"id": "eval", "type": "external", "label": "wikieval", "sublabel": "golden hit@k"}
+  ],
+  "messages": [
+    {"id": "t5-m1", "from": "mm", "to": "mem", "y": 160, "label": "đọc episode (mặc định)", "variant": "default"},
+    {"id": "t5-m2", "from": "mm", "to": "store", "y": 194, "label": "--source zeromem: mở read-only", "variant": "security"},
+    {"id": "t5-m3", "from": "store", "to": "mm", "y": 228, "label": "phiên và turn, không có tool output", "variant": "return"},
+    {"id": "t5-m4", "from": "mm", "to": "html", "y": 262, "label": "dựng graph phiên → file", "variant": "emphasis"},
+    {"id": "t5-m5", "from": "eval", "to": "mm", "y": 296, "label": "chạy golden cross-session", "variant": "default"},
+    {"id": "t5-m6", "from": "mm", "to": "eval", "y": 330, "label": "hit@k cho cả hai backend", "variant": "return"}
+  ]
+}

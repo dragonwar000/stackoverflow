@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "T1 — Cài và ghim zeromem",
+    "output": "031026-zeromem-parallel-backend-t1.html",
+    "viewBox": [880, 480],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {"id": "dev", "type": "external", "label": "Người dùng", "sublabel": "chạy một lệnh"},
+    {"id": "install", "type": "backend", "label": "zeromem-install.sh", "sublabel": "đọc lock"},
+    {"id": "lock", "type": "database", "label": "zeromem-lock.json", "sublabel": "rev + sha256"},
+    {"id": "cargo", "type": "external", "label": "cargo install", "sublabel": "--locked"},
+    {"id": "model", "type": "external", "label": "Model bge-small", "sublabel": "~130 MB"}
+  ],
+  "messages": [
+    {"id": "t1-m1", "from": "dev", "to": "install", "y": 160, "label": "chạy zeromem-install.sh", "variant": "emphasis"},
+    {"id": "t1-m2", "from": "install", "to": "lock", "y": 194, "label": "đọc rev eda212665 và sha", "variant": "default"},
+    {"id": "t1-m3", "from": "install", "to": "cargo", "y": 228, "label": "build đúng rev đã ghim", "variant": "emphasis"},
+    {"id": "t1-m4", "from": "cargo", "to": "install", "y": 262, "label": "zm trên PATH", "variant": "return"},
+    {"id": "t1-m5", "from": "install", "to": "model", "y": 296, "label": "tải model, so sha256", "variant": "security"},
+    {"id": "t1-m6", "from": "model", "to": "install", "y": 330, "label": "sha khớp mới ghi vào home", "variant": "return"},
+    {"id": "t1-m7", "from": "install", "to": "dev", "y": 364, "label": "in trạng thái: đủ hay thiếu model", "variant": "return"}
+  ]
+}
