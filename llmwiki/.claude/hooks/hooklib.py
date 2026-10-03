@@ -214,6 +214,15 @@ def _is_guardrail(fid, spec) -> bool:
     return fid in GUARDRAIL_FALLBACK or (spec or {}).get("class") == "guardrail"
 
 
+def _feature_config_path(root: str, rel: str) -> pathlib.Path:
+    """config_file trong registry ghi theo layout framework; phần đầu là thư mục harness thì map qua
+    harness_dir, để dự án khách (.harness/) đọc đúng file."""
+    parts = pathlib.PurePosixPath(rel).parts
+    if parts and parts[0] in HARNESS_DIRS:
+        return harness_dir(root).joinpath(*parts[1:])
+    return pathlib.Path(root) / rel
+
+
 def feature_on(root: str, fid: str, default=None, argv=None, env=None):
     """Trả (bật?, tầng nguồn). Thứ tự: cờ --feature > env OVERSTACK_FEATURE_<ID> > env cũ (legacy_env)
     > features.local.yaml > config của công tắc > default (tham số, rồi registry, rồi BẬT).
@@ -226,8 +235,8 @@ def feature_on(root: str, fid: str, default=None, argv=None, env=None):
         spec = feature_registry(root).get(fid) or {}
         guard = _is_guardrail(fid, spec)
         fb = default if default is not None else _as_bool(spec.get("default"))
-        if fb is None:
-            fb = True
+        if fb is None or guard:
+            fb = True   # guardrail: mặc định luôn BẬT, caller không hạ được bằng default
         if not guard:
             v = _argv_flag(argv, fid)
             if v is not None:
@@ -250,7 +259,7 @@ def feature_on(root: str, fid: str, default=None, argv=None, env=None):
             if v is not None:
                 return v, f"file cục bộ {LOCAL_FEATURES_FILE}"
         if not guard and spec.get("config_file") and spec.get("config_key"):
-            v = _as_bool(_read_yaml(pathlib.Path(root) / spec["config_file"]).get(spec["config_key"]))
+            v = _as_bool(_read_yaml(_feature_config_path(root, spec["config_file"])).get(spec["config_key"]))
             if v is not None:
                 return v, f"config {spec['config_file']}"
         return fb, "mặc định"

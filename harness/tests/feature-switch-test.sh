@@ -55,6 +55,13 @@ check("13 exception feature → default", hl.feature_on(None, "wikigraph", defau
 # 14 evidence-terminal: env=1 KHÔNG thắng config enabled:false (giữ hành vi hôm nay)
 open(os.path.join(tmp, "harness", "evidence-terminal.config.yaml"), "w").write("enabled: false\n")
 check("14 env=1 không thắng config enabled:false", hl.feature_on(tmp, "evidence-terminal", env={"OVERSTACK_EVIDENCE_TERMINAL": "1"}), (False, "config harness/evidence-terminal.config.yaml"))
+# 15 guardrail: caller truyền default=False vẫn BẬT (không hạ guardrail bằng tham số)
+check("15 guardrail default=False vẫn bật", hl.feature_on(tmp, "egress-guard", default=False, env={}), (True, "mặc định"))
+# 16 layout dự án khách (.llmwiki/ + .harness/): config của công tắc vẫn được đọc
+dot = os.path.join(tmp, "dot"); os.makedirs(os.path.join(dot, ".llmwiki")); os.makedirs(os.path.join(dot, ".harness"))
+open(os.path.join(dot, ".harness", "features.yaml"), "w").write(open(os.path.join(tmp, "harness", "features.yaml"), encoding="utf-8").read())
+open(os.path.join(dot, ".harness", "evidence-terminal.config.yaml"), "w").write("enabled: false\n")
+check("16 layout .harness đọc được config", hl.feature_on(dot, "evidence-terminal", env={}), (False, "config harness/evidence-terminal.config.yaml"))
 
 print(f"feature-switch-test: {passed} pass, {failed} fail")
 sys.exit(1 if failed else 0)
