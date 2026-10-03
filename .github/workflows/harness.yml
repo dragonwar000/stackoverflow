@@ -30,6 +30,8 @@ jobs:
         run: bash harness/tests/wiki-graph-user-reachability-test.sh .
       - name: memory-map user-reachability (bộ-nhớ-thứ-cấp tự chạy downstream)
         run: bash harness/tests/memory-map-user-reachability-test.sh .
+      - name: zeromem-install — kiểm sha256 model theo lock
+        run: bash harness/tests/zeromem-install-test.sh .
 
   validate-content:
     name: validate file .md đổi (layer=repo)
