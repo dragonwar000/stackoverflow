@@ -5811,3 +5811,7 @@ cc4f999ad |
 - SPEC `wiki/sources/draft/031026-harness-feature-switches.md` (R7 PASS), companion `llmwiki/html/031026-harness-feature-switches-seq.html` + 4 sơ đồ archify (classic).
 - Khảo sát: hook toàn cục gate bằng stamp, 22 rule không có khoá enabled, 2 config enabled, env rải rác; OVERSTACK_WIKIGRAPH đọc theo hai nghĩa (stop.py:117, session_start.py:289).
 - Đã duyệt 03/10/2026; bàn giao /plan.
+
+## 2026-10-03 — docs — recent-work-report
+- Trang `llmwiki/html/031026-recent-work-report.html` (cổng tĩnh rc 0, cổng chạy thật 1/1) + output-report draft.
+- Eval chưa làm: `wikieval` chặn agent gọi, chờ người dùng chạy.

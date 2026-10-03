@@ -336,3 +336,4 @@
 | [031026-harness-feature-switches](sources/draft/031026-harness-feature-switches.md) | draft | Công tắc bật/tắt harness: danh mục features.yaml, bộ đọc feature_on, lệnh feature-switch; chờ duyệt |
 | [031026-session-provenance](sources/provenance/031026-session-provenance.md) | source | Auto-distill scratch-log phiên 2a40433d: ghi nhận việc cài và ghim zeromem (cài zm, kiểm sha256 model theo lock), chỉ chạm `ledger.jsonl` |
 | [031026-harness-feature-switches-PLAN](sources/draft/031026-harness-feature-switches-PLAN.md) | draft | PLAN thi hành công tắc bật/tắt harness: 4 task (registry + feature_on, CLI, chuyển cờ + policy switch, kiểm nhất quán); chờ dispatch |
+| [031026-recent-work-report](sources/draft/031026-recent-work-report.md) | draft | Output-report: trang tổng kết năm việc gần đây (merge upstream, zeromem, công tắc harness) |
