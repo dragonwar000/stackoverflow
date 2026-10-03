@@ -170,6 +170,13 @@ FEATURE_REGISTRY_FILE = "features.yaml"
 LOCAL_FEATURES_FILE = "features.local.yaml"
 # Guardrail: vẫn BẬT khi registry thiếu/lỗi (FR-004). Chỉ file cục bộ được tắt.
 GUARDRAIL_FALLBACK = ("egress-guard", "orca-guard", "inject-scan")
+# Env cũ vẫn phải có hiệu lực khi không đọc được registry (thiếu PyYAML, thiếu file) — FR-006.
+# Phải khớp harness/features.yaml; feature-switch-test so hai nơi.
+LEGACY_ENV_FALLBACK = {
+    "wikigraph": {"legacy_env": "OVERSTACK_WIKIGRAPH", "legacy_on": ["1"], "legacy_off": ["0"]},
+    "goal-hook": {"legacy_env": "OVERSTACK_GOAL_HOOK", "legacy_off": ["0"]},
+    "evidence-terminal": {"legacy_env": "OVERSTACK_EVIDENCE_TERMINAL", "legacy_off": ["0", "false", "off"]},
+}
 _YAML_WARNED = False
 
 
@@ -199,8 +206,12 @@ def _as_bool(v):
 
 
 def feature_registry(root: str) -> dict:
-    """Mục `features` của harness/features.yaml (qua harness_dir). Thiếu hoặc lỗi → {}."""
-    return _read_yaml(harness_dir(root) / FEATURE_REGISTRY_FILE).get("features") or {}
+    """Mục `features` của danh mục công tắc. Tìm trong thư mục harness của dự án trước, rồi bản
+    global-shared (dự án khách không chứa engine). Thiếu hoặc lỗi → {}."""
+    f = harness_dir(root) / FEATURE_REGISTRY_FILE
+    if not f.is_file():
+        f = HARNESS_HOME / "harness" / FEATURE_REGISTRY_FILE
+    return _read_yaml(f).get("features") or {}
 
 
 def _argv_flag(argv, fid):
@@ -232,7 +243,7 @@ def feature_on(root: str, fid: str, default=None, argv=None, env=None):
     argv = list(argv or [])
     guard = fid in GUARDRAIL_FALLBACK
     try:
-        spec = feature_registry(root).get(fid) or {}
+        spec = feature_registry(root).get(fid) or LEGACY_ENV_FALLBACK.get(fid) or {}
         guard = _is_guardrail(fid, spec)
         fb = default if default is not None else _as_bool(spec.get("default"))
         if fb is None or guard:

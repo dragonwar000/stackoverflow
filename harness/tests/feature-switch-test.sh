@@ -14,6 +14,7 @@ import importlib.util, os, sys
 hl_path, tmp = sys.argv[1], sys.argv[2]
 spec = importlib.util.spec_from_file_location("hooklib", hl_path)
 hl = importlib.util.module_from_spec(spec); spec.loader.exec_module(hl)
+hl.HARNESS_HOME = __import__("pathlib").Path(tmp) / "no-global"   # không để bản cài toàn cục của máy lọt vào test
 passed = failed = 0
 def check(name, got, want):
     global passed, failed
@@ -62,6 +63,19 @@ dot = os.path.join(tmp, "dot"); os.makedirs(os.path.join(dot, ".llmwiki")); os.m
 open(os.path.join(dot, ".harness", "features.yaml"), "w").write(open(os.path.join(tmp, "harness", "features.yaml"), encoding="utf-8").read())
 open(os.path.join(dot, ".harness", "evidence-terminal.config.yaml"), "w").write("enabled: false\n")
 check("16 layout .harness đọc được config", hl.feature_on(dot, "evidence-terminal", env={}), (False, "config harness/evidence-terminal.config.yaml"))
+# 17 registry thiếu: env cũ vẫn tắt được goal-hook (FR-006, bảng LEGACY_ENV_FALLBACK)
+check("17 registry thiếu, OVERSTACK_GOAL_HOOK=0 vẫn tắt", hl.feature_on(empty, "goal-hook", env={"OVERSTACK_GOAL_HOOK": "0"}), (False, "env OVERSTACK_GOAL_HOOK"))
+# 18 bảng LEGACY_ENV_FALLBACK khớp registry
+reg = hl.feature_registry(tmp)
+keys = ("legacy_env", "legacy_on", "legacy_off")
+want = {fid: {k: spec[k] for k in keys if k in spec} for fid, spec in reg.items() if spec.get("legacy_env")}
+check("18 LEGACY_ENV_FALLBACK khớp features.yaml", hl.LEGACY_ENV_FALLBACK, want)
+# 19 dự án khách không có features.yaml: đọc registry từ bản global-shared
+glob = os.path.join(tmp, "global"); os.makedirs(os.path.join(glob, "harness"))
+open(os.path.join(glob, "harness", "features.yaml"), "w").write(open(os.path.join(tmp, "harness", "features.yaml"), encoding="utf-8").read())
+hl.HARNESS_HOME = __import__("pathlib").Path(glob)
+check("19 registry lấy từ global khi dự án không có", sorted(hl.feature_registry(empty)) == sorted(reg), True)
+hl.HARNESS_HOME = __import__("pathlib").Path(tmp) / "no-global"
 
 print(f"feature-switch-test: {passed} pass, {failed} fail")
 sys.exit(1 if failed else 0)
