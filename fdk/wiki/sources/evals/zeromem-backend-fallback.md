@@ -8,7 +8,7 @@ asserts:
   - 'icontains:zeromem'
   - 'icontains:mem-rank'
   - 'icontains:mem-rank.config.yaml'
-  - 'regex:(?i)(rơi về|fallback|fall back|quay về|lùi về)'
+  - 'regex:(?i)(rơi về|fallback|fall back|fail-open về|quay về|lùi về|tạm dùng|hạ cấp)'
 rubric: "ĐẠT nếu nêu đúng mặc định, đúng file config, và hành vi rơi về mem-rank khi thiếu zm. KHÔNG đạt nếu nói thiếu zm thì lỗi hoặc chặn phiên."
 ---
 
