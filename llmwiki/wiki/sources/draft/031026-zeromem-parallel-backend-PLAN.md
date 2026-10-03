@@ -646,7 +646,7 @@ git commit -m "feat(zeromem): khoá memory.backend, mặc định zeromem, rơi 
 **Files:**
 - Sửa: `llmwiki/.claude/hooks/stop.py` — thêm `zeromem_write` trước dòng `secondary_memory(root, ...)` (hiện ở khoảng dòng 431); gate khối `mr episode` trong `secondary_memory` (hiện ở khoảng dòng 214–226) bằng `memory_backend`.
 - Sửa: `llmwiki/.claude/hooks/session_start.py` — thêm `_zeromem_recall`; ở đầu hàm `recall` (dòng 223), gọi `_zeromem_recall` và `return` sớm khi backend là `zeromem`.
-- Sửa: `llmwiki/.claude/hooks/session_end.py` — gọi `zeromem_write` trong `main()` sau `audit(payload, "SessionEnd")`.
+- Sửa: `llmwiki/.claude/hooks/session_end.py` — thêm bản `zeromem_write` riêng (dùng `subprocess.run`, không dùng `_run`); gọi trong `main()` ngay sau dòng gán `root`, truyền `str(root)`.
 - Tạo: `harness/tests/zeromem-hooks-test.sh`
 - Sửa: `.github/workflows/harness.yml` (thêm step)
 
@@ -678,7 +678,7 @@ for f in llmwiki/.claude/hooks/stop.py llmwiki/.claude/hooks/session_start.py ll
   python3 -m py_compile "$f" && ok "cú pháp $(basename "$f")" || bad "cú pháp $(basename "$f")" "py_compile lỗi"
 done
 
-PROJ="$TMP/proj"; mkdir -p "$PROJ/harness" "$PROJ/llmwiki"
+PROJ="$TMP/proj"; mkdir -p "$PROJ/harness" "$PROJ/llmwiki/wiki"
 git -C "$PROJ" init -q && git -C "$PROJ" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "feat: xuất csv"
 cp harness/mem-rank.config.yaml "$PROJ/harness/" && cp -r harness/scripts "$PROJ/harness/" && mkdir -p "$PROJ/harness/tests" && cp -r harness/tests/fixtures "$PROJ/harness/tests/"
 
@@ -689,6 +689,10 @@ echo "$out" | grep -q 'Trí nhớ zeromem' && echo "$out" | grep -q 'aaaaaaaa' &
 sed -i.bak 's/backend: zeromem/backend: mem-rank/' "$PROJ/harness/mem-rank.config.yaml"
 out=$(echo '{"session_id":"bbbbbbbb","cwd":"'"$PROJ"'"}' | CLAUDE_PROJECT_DIR="$PROJ" python3 llmwiki/.claude/hooks/session_start.py 2>/dev/null)
 echo "$out" | grep -q 'Trí nhớ zeromem' && bad "backend mem-rank" "vẫn in recall zeromem" || ok "backend mem-rank không in recall zeromem"
+
+echo '{}' > "$TMP/t.jsonl"
+echo '{"session_id":"cccccccc","transcript_path":"'"$TMP"'/t.jsonl","cwd":"'"$PROJ"'"}' | CLAUDE_PROJECT_DIR="$PROJ" python3 llmwiki/.claude/hooks/session_end.py >/dev/null 2>"$TMP/se.err"
+[ $? -eq 0 ] && ! grep -q Traceback "$TMP/se.err" && ok "SessionEnd chạy ghi zeromem không lỗi" || bad "SessionEnd" "$(head -3 "$TMP/se.err")"
 
 echo "zeromem-hooks-test: $pass pass, $fail fail"
 [ $fail -eq 0 ] && echo "PASS" || exit 1
@@ -711,7 +715,7 @@ def _zeromem_recall(root: Path, sid: str, backend: str) -> None:
     """
     if backend not in ("zeromem", "both"):
         return
-    zb = resolve_tool(str(root), "harness/scripts/zeromem-bridge.py")
+    zb = resolve_tool(str(root), "harness/scripts/zeromem-bridge.py")  # bare-path: ok — rel khung framework, resolve_tool map sang global ~/.claude/harness/harness/scripts
     if not zb:
         return
     try:
@@ -747,7 +751,7 @@ Trong `llmwiki/.claude/hooks/stop.py`, thêm trước `def secondary_memory`:
 ```python
 def zeromem_write(root: str, session: str, tp: str) -> None:
     """Ghi turn của phiên vào store zeromem của project, qua bridge → zm hook. Fail-open, theo ngân sách Stop."""
-    zb = resolve_tool(root, "harness/scripts/zeromem-bridge.py")
+    zb = resolve_tool(root, "harness/scripts/zeromem-bridge.py")  # bare-path: ok — rel khung framework, resolve_tool map sang global ~/.claude/harness/harness/scripts
     if not zb or not tp:
         return
     try:
@@ -771,18 +775,37 @@ Trong `main()` của `stop.py`, đặt ngay trước dòng `secondary_memory(roo
 
 Biến `tp` đã được gán ở đầu `main()` (dòng `tp = payload.get("transcript_path")`). Thêm `memory_backend` vào import từ `hooklib` ở đầu `stop.py`.
 
-Trong `llmwiki/.claude/hooks/session_end.py`, thêm vào đầu file cùng hàm `zeromem_write` (bản sao, không import chéo giữa hooks), và trong `main()` ngay sau `audit(payload, "SessionEnd")`:
+Trong `llmwiki/.claude/hooks/session_end.py`, thêm ngay trên `def main()` một bản `zeromem_write` riêng. File này không có `_run` (ngân sách Stop chỉ có ở `stop.py`) và không import `resolve_tool` ở đầu file, nên bản này dùng `subprocess.run` và import cục bộ:
 
 ```python
-    zeromem_write(str(root_of_project), (payload.get("session_id") or ""), payload.get("transcript_path") or "")
+def zeromem_write(root: str, session: str, tp: str) -> None:
+    """Ghi turn của phiên vào store zeromem của project, qua bridge → zm hook. Fail-open, timeout 12s.
+
+    Bản copy của stop.py (không import chéo giữa hooks). Không dùng _run() vì module này không có ngân sách Stop.
+    """
+    from hooklib import resolve_tool  # cục bộ: import đầu file không có resolve_tool
+    zb = resolve_tool(root, "harness/scripts/zeromem-bridge.py")  # bare-path: ok — rel khung framework, resolve_tool map sang global ~/.claude/harness/harness/scripts
+    if not zb or not tp:
+        return
+    try:
+        subprocess.run([sys.executable, zb, "ingest", "--root", root, "--session", session, "--transcript", tp],
+                       cwd=root, capture_output=True, timeout=12)
+    except Exception:
+        pass
 ```
 
-Dùng đúng biến chứa đường dẫn project trong `session_end.py`. Nếu hàm `main()` chưa có biến đó, lấy bằng `project_dir(payload)` từ `hooklib`.
+Trong `main()`, gọi ngay sau dòng `root = pathlib.Path(project_dir(payload))`. Không đặt sau `audit(...)`, vì lúc đó `root` chưa được gán:
+
+```python
+    zeromem_write(str(root), (payload.get("session_id") or ""), payload.get("transcript_path") or "")
+```
+
+Ghi chú: `memory_backend()` trong `hooklib` gọi subprocess với `timeout=5` và không kẹp theo ngân sách `_run` của Stop. Giữ nguyên, đã chấp nhận ở T4.
 
 - [ ] **Step 5: chạy lại — PASS**
 
 Chạy: `bash harness/tests/zeromem-hooks-test.sh .`
-Mong đợi: `zeromem-hooks-test: 5 pass, 0 fail` rồi `PASS`, rc 0.
+Mong đợi: `zeromem-hooks-test: 6 pass, 0 fail` rồi `PASS`, rc 0.
 
 - [ ] **Step 6: đăng ký CI và commit**
 
@@ -794,7 +817,7 @@ Thêm step vào `.github/workflows/harness.yml`:
 ```
 
 ```bash
-git add llmwiki/.claude/hooks/stop.py llmwiki/.claude/hooks/session_start.py llmwiki/.claude/hooks/session_end.py llmwiki/.claude/hooks/hooklib.py harness/tests/zeromem-hooks-test.sh .github/workflows/harness.yml
+git add llmwiki/.claude/hooks/stop.py llmwiki/.claude/hooks/session_start.py llmwiki/.claude/hooks/session_end.py harness/tests/zeromem-hooks-test.sh .github/workflows/harness.yml
 git commit -m "feat(zeromem): ghi turn ở Stop và SessionEnd, recall ở SessionStart"
 ```
 
@@ -811,7 +834,7 @@ git commit -m "feat(zeromem): ghi turn ở Stop và SessionEnd, recall ở Sessi
 
 **Interfaces:**
 - Consumes: `store_home(root: str) -> Path` từ `harness/scripts/zeromem-bridge.py` (Task 2), nạp qua hàm `_load` có sẵn trong `memory-map.py`. Schema của bảng `turns` trong `zeromem.db`: `id, session_id, session_turn, speaker, text, ts` (đã kiểm trong `crates/zeromem/src/store.rs` của zeromem `eda212665`).
-- Produces: `_zeromem_sessions(root) -> list[tuple[str, int, int, int]]`, mỗi tuple là `(session_id, ts_đầu, số_turn, ts_cuối)`, sắp theo `ts_đầu`. Hàm trả về `None` khi chưa có `zeromem.db`. Lệnh `python3 fdk/tools/memory-map.py --source zeromem` ghi `llmwiki/html/memory-map-zeromem.html`, không ghi đè `memory-map.html`.
+- Produces: `_zeromem_sessions(root) -> list[tuple[str, int, int, int]]`, mỗi tuple là `(session_id, ts_đầu, số_turn, ts_cuối)`, sắp theo `ts_đầu`. Hàm trả về `None` khi chưa có `zeromem.db`. Lệnh `python3 fdk/tools/memory-map.py --source zeromem` ghi `llmwiki/html/memory-map-zeromem.html`, không ghi đè `memory-map.html`; schema lạ thì rc 1. Đồ thị chỉ có node phiên, không có cạnh: zeromem không lưu quan hệ cha–con giữa các phiên.
 
 **Depends:** Task 2
 
@@ -833,6 +856,7 @@ pass=0; fail=0
 ok(){ printf '  \033[1;32m✓\033[0m %s\n' "$1"; pass=$((pass+1)); }
 bad(){ printf '  \033[1;31m✗\033[0m %s — %s\n' "$1" "$2"; fail=$((fail+1)); }
 
+# Chạy trong project tạm: memory-map lấy ROOT = cwd khi cwd có llmwiki/, nên store key khớp với DB seed ở dưới.
 PROJ="$TMP/proj"; mkdir -p "$PROJ/llmwiki/html"
 STORE=$(python3 -c "import sys; sys.path.insert(0,'harness/scripts'); import importlib.util as u; s=u.spec_from_file_location('zb','harness/scripts/zeromem-bridge.py'); m=u.module_from_spec(s); s.loader.exec_module(m); print(m.store_home('$PROJ'))")
 mkdir -p "$STORE" && python3 - "$STORE/zeromem.db" <<'PY'
@@ -844,8 +868,12 @@ con.executemany("INSERT INTO turns (session_id, session_turn, speaker, text, ts)
 con.commit(); con.close()
 PY
 
-python3 fdk/tools/memory-map.py --source zeromem > "$TMP/out.log" 2>&1
-[ $? -eq 0 ] && grep -q 'memory-map-zeromem.html' "$TMP/out.log" && ok "--source zeromem chạy và báo đúng file đích" || bad "chạy --source zeromem" "$(cat "$TMP/out.log")"
+(cd "$PROJ" && python3 "$ROOT/fdk/tools/memory-map.py" --source zeromem) > "$TMP/out.log" 2>&1
+rc=$?
+[ $rc -eq 0 ] && grep -q 'memory-map-zeromem.html' "$TMP/out.log" && [ -f "$PROJ/llmwiki/html/memory-map-zeromem.html" ] \
+  && ok "--source zeromem chạy và ghi đúng file đích" || bad "chạy --source zeromem" "rc=$rc $(cat "$TMP/out.log")"
+
+[ ! -e "$PROJ/llmwiki/html/memory-map.html" ] && ok "không ghi đè memory-map.html" || bad "memory-map.html bị ghi" "file đích sai"
 
 python3 - "$STORE/zeromem.db" <<'PY' && ok "DB không bị ghi (đọc ở chế độ ro)" || bad "DB bị ghi" "số turn đổi"
 import sqlite3, sys
@@ -857,32 +885,34 @@ python3 - "$STORE/zeromem.db" <<'PY'
 import sqlite3, sys
 con = sqlite3.connect(sys.argv[1]); con.execute("ALTER TABLE turns RENAME COLUMN text TO body"); con.commit(); con.close()
 PY
-python3 fdk/tools/memory-map.py --source zeromem > "$TMP/schema.log" 2>&1
-grep -q 'schema zeromem lạ' "$TMP/schema.log" && ok "schema lạ → báo lỗi, không vẽ bừa" || bad "schema lạ" "$(cat "$TMP/schema.log")"
+(cd "$PROJ" && python3 "$ROOT/fdk/tools/memory-map.py" --source zeromem) > "$TMP/schema.log" 2>&1
+schema_rc=$?
+[ $schema_rc -ne 0 ] && grep -q 'schema zeromem lạ' "$TMP/schema.log" \
+  && ok "schema lạ → báo lỗi rc≠0, không vẽ bừa" || bad "schema lạ" "rc=$schema_rc $(cat "$TMP/schema.log")"
 
 echo "zeromem-memory-map-test: $pass pass, $fail fail"
 [ $fail -eq 0 ] && echo "PASS" || exit 1
 ```
 
-Ghi chú: test dùng `fdk/tools/memory-map.py` và ghi `llmwiki/html/memory-map-zeromem.html` trong repo. Test chạy trên bản sao của repo để không làm bẩn cây làm việc. Trước khi chạy, copy repo vào `$TMP` hoặc chạy trong worktree tạm.
+Ghi chú: test `cd` vào project tạm `$PROJ` rồi gọi `memory-map.py` của repo. `memory-map.py` lấy `ROOT` là thư mục hiện tại khi ở đó có `llmwiki/`, nên file đích và khoá store đều nằm trong `$TMP`, cây làm việc không bị ghi.
 
 - [ ] **Step 2: chạy cho thấy fail**
 
 Chạy: `bash harness/tests/zeromem-memory-map-test.sh .`
-Mong đợi: 0 pass, 3 fail, vì `memory-map.py` chưa có `--source zeromem`.
+Mong đợi: test fail ở ca đầu và ca schema, vì `memory-map.py` chưa có `--source zeromem`.
 
 - [ ] **Step 3: viết nhánh zeromem trong memory-map.py**
 
-Trong `fdk/tools/memory-map.py`, thêm `import sqlite3` vào khối import đầu file. Thêm hàm sau `_session_parents`:
+Trong `fdk/tools/memory-map.py`, thêm `import sqlite3` vào khối import đầu file. Thêm hai hàm ngay trên `_session_parents`:
 
 ```python
 def _zeromem_sessions(root):
     """Phiên và số turn từ zeromem.db, chỉ đọc. None khi chưa có store. Lỗi schema → RuntimeError."""
-    zb = _load("harness/scripts/zeromem-bridge.py", "zb")
+    zb = _load(Path("harness") / "scripts" / "zeromem-bridge.py", "zb")
     db = zb.store_home(str(root)) / "zeromem.db"
     if not db.is_file():
         return None
-    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    con = sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True)
     try:
         cols = {r[1] for r in con.execute("PRAGMA table_info(turns)")}
         need = {"session_id", "session_turn", "speaker", "text", "ts"}
@@ -896,20 +926,22 @@ def _zeromem_sessions(root):
 
 
 def _main_zeromem():
-    rows = _zeromem_sessions(ROOT)
+    try:
+        rows = _zeromem_sessions(ROOT)
+    except (RuntimeError, sqlite3.Error) as e:
+        print(f"memory-map --source zeromem: {e}", file=sys.stderr)
+        return 1
     if rows is None:
         print("memory-map --source zeromem: chưa có zeromem.db của project này")
         return 0
-    nodes, edges, prev = [], [], None
-    for sid, ts0, n, ts1 in rows:
-        node_id = f"s:{sid[:8]}"
-        nodes.append({"id": node_id, "type": "session", "title": f"{n} turn · {sid[:8]}",
-                      "wiki": "memory", "label": sid[:8]})
-        if prev:
-            edges.append({"from": prev, "rel": "continues", "to": node_id, "kind": "to"})
-        prev = node_id
+    # Chỉ id, số turn, mốc thời gian. Không đọc cột text: nội dung turn không đi vào đồ thị.
+    nodes = [{"id": f"s:{sid[:8]}", "path": f"session/{sid[:8]}", "group": "session", "type": "session",
+              "title": f"{n} turn · {sid[:8]}", "wiki": "memory", "label": sid[:8]}
+             for sid, _ts0, n, _ts1 in rows]
     out = ROOT / "llmwiki" / "html" / "memory-map-zeromem.html"
-    out.write_text(_ovs_font(WG.build_html("memory", str(out), nodes, edges, [], {})), encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fn = WG.build_static if "--static" in sys.argv else WG.build_html
+    out.write_text(_ovs_font(fn("memory", str(out), nodes, [], [], {})), encoding="utf-8")
     print(f"✓ wrote {out.relative_to(ROOT)} — {len(nodes)} phiên (zeromem, chỉ đọc)")
     return 0
 ```
@@ -921,12 +953,12 @@ Trong `main()`, ngay đầu hàm trước dòng `nodes, edges = build()`:
         return _main_zeromem()
 ```
 
-Mã này dùng `_load`, `WG`, `_ovs_font`, `ROOT` đã có trong `memory-map.py`. Trước khi sửa, đọc lại dòng định nghĩa `_load` để xác nhận chữ ký.
+Mã này dùng `_load`, `WG`, `_ovs_font`, `ROOT` đã có trong `memory-map.py`. Đường dẫn bridge ghép bằng `Path("harness") / "scripts" / ...` để qua `bare_path_lint.py`. Không vẽ cạnh `continues` theo thứ tự thời gian: hai phiên kề nhau về thời gian không có nghĩa là phiên sau nối tiếp phiên trước.
 
 - [ ] **Step 4: chạy lại — PASS**
 
 Chạy: `bash harness/tests/zeromem-memory-map-test.sh .`
-Mong đợi: `zeromem-memory-map-test: 3 pass, 0 fail` rồi `PASS`, rc 0.
+Mong đợi: `zeromem-memory-map-test: 4 pass, 0 fail` rồi `PASS`, rc 0.
 
 Chạy: `python3 fdk/tools/memory-map.py` (không có `--source`)
 Mong đợi: hành vi cũ không đổi, in dòng `✓ wrote llmwiki/html/memory-map.html`, hoặc `chưa có dữ liệu` nếu chưa có scratch-log.
@@ -939,6 +971,7 @@ Tạo `harness/evals/zeromem-cross-session.json`:
 {
   "schema": 1,
   "note": "Golden cross-session: câu hỏi thuộc phiên A, truy vấn từ phiên B. Hit@k đo trên zeromem thật (ZEROMEM_E2E=1); CI chỉ kiểm harness bằng fake zm.",
+  "query_session": "B",
   "sessions": {
     "A": ["Carrie lo sach ban sci-fi tu Ingram", "Dung Books mo o Jersey City"],
     "B": ["sua hook stop cho dung budget"]
@@ -954,45 +987,84 @@ Tạo `harness/tests/zeromem-eval-test.sh`:
 
 ```bash
 #!/usr/bin/env bash
-# zeromem-eval-test — hit@k cross-session. ZEROMEM_E2E=1 dùng zm thật; mặc định dùng fake zm (chỉ kiểm harness).
+# zeromem-eval-test — hit@k cross-session. Mặc định dùng fake zm (chỉ kiểm harness, KHÔNG phải chất lượng);
+# ZEROMEM_E2E=1 seed hai phiên golden vào store TẠM rồi đo bằng zm thật qua zeromem-bridge.py.
 set -u
 ROOT="${1:-.}"; cd "$ROOT" || exit 2
 ROOT="$(pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+chmod 700 "$TMP"
 export OVERSTACK_ZEROMEM_HOME="$TMP/stores"
-if [ "${ZEROMEM_E2E:-0}" = "1" ]; then
-  command -v zm >/dev/null 2>&1 || { echo "ZEROMEM_E2E=1 nhưng không có zm — không đo được"; exit 2; }
-  MODE=real
-else
-  export ZEROMEM_ZM="$ROOT/harness/tests/fixtures/fake-zm.py"; MODE=fake
-fi
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+BRIDGE="$ROOT/harness/scripts/zeromem-bridge.py"
+GOLDEN="$ROOT/harness/evals/zeromem-cross-session.json"
 pass=0; fail=0
 ok(){ printf '  \033[1;32m✓\033[0m %s\n' "$1"; pass=$((pass+1)); }
 bad(){ printf '  \033[1;31m✗\033[0m %s — %s\n' "$1" "$2"; fail=$((fail+1)); }
 
-python3 - "$ROOT" "$MODE" <<'PY' > "$TMP/hits.txt"
-import json, subprocess, sys
-root, mode = sys.argv[1], sys.argv[2]
+if [ "${ZEROMEM_E2E:-0}" = "1" ]; then
+  MODE=real
+  unset ZEROMEM_ZM
+  command -v zm >/dev/null 2>&1 || { echo "ZEROMEM_E2E=1 nhưng không có zm — không đo được"; exit 2; }
+  # Seed chỉ vào store tạm (OVERSTACK_ZEROMEM_HOME trỏ TMP). Ingest qua đúng db của bridge, không ghi cứng đường dẫn.
+  python3 - "$ROOT" "$(command -v zm)" "$TMP" <<'PY' || { echo "seed zeromem thất bại"; exit 2; }
+import importlib.util, json, subprocess, sys
+root, zm, tmp = sys.argv[1], sys.argv[2], sys.argv[3]
+spec = importlib.util.spec_from_file_location("zb", f"{root}/harness/scripts/zeromem-bridge.py")
+zb = importlib.util.module_from_spec(spec); spec.loader.exec_module(zb)
+home = zb.ensure_store(zb.store_home(root))
 g = json.load(open(f"{root}/harness/evals/zeromem-cross-session.json", encoding="utf-8"))
+lines, ts = [], 1000
+for sid, texts in g["sessions"].items():
+    for t in texts:
+        ts += 1
+        lines.append(json.dumps({"session_id": sid, "speaker": "user", "text": t, "ts": ts}, ensure_ascii=False))
+seed = f"{tmp}/seed.jsonl"
+open(seed, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+p = subprocess.run([zm, "--db", str(home / "zeromem.db"), "ingest", seed], capture_output=True, text=True, timeout=300)
+print(p.stdout.strip()); print(p.stderr.strip()[-300:], file=sys.stderr)
+sys.exit(p.returncode)
+PY
+else
+  MODE=fake
+  export ZEROMEM_ZM="$ROOT/harness/tests/fixtures/fake-zm.py"
+fi
+
+python3 - "$ROOT" "$MODE" "$BRIDGE" "$GOLDEN" <<'PY' > "$TMP/hits.txt"
+import json, re, subprocess, sys
+root, mode, bridge, golden = sys.argv[1:5]
+g = json.load(open(golden, encoding="utf-8"))
 hit = 0
 for case in g["cases"]:
-    out = subprocess.run([sys.executable, f"{root}/harness/scripts/zeromem-bridge.py", "recall",
-                          "--root", root, "--query", case["query"], "--exclude-session", "zzzzzzzz",
-                          "--top-k", str(case["k"])], capture_output=True, text=True).stdout
-    ok = bool(out.strip()) if mode == "fake" else out.strip() != ""
+    out = subprocess.run([sys.executable, bridge, "recall", "--root", root, "--query", case["query"],
+                          "--exclude-session", g["query_session"], "--top-k", str(case["k"])],
+                         capture_output=True, text=True).stdout.splitlines()
+    if mode == "real":   # đo thật: phải có evidence của đúng phiên mong đợi trong top-k
+        ok = any(ln.startswith(f"- [{case['expect_session']}] ") for ln in out)
+    else:                # fake: chỉ kiểm bridge trả đúng định dạng dòng evidence, KHÔNG kiểm chất lượng
+        ok = any(re.match(r"- \[[^\]]+\] ", ln) for ln in out)
     hit += int(ok)
     print(f"{case['id']} {'HIT' if ok else 'MISS'}")
 print(f"HITRATE {hit}/{len(g['cases'])}")
 PY
 cat "$TMP/hits.txt"
 rate=$(grep HITRATE "$TMP/hits.txt" | awk '{print $2}')
-[ "$MODE" = "fake" ] && ok "harness eval chạy với fake zm ($rate)" || ok "eval zeromem thật ($rate)"
-grep -q 'MISS' "$TMP/hits.txt" && [ "$MODE" = "real" ] && bad "hit@k thật" "có ca MISS" || true
+if [ -z "$rate" ]; then
+  bad "harness eval" "không có dòng HITRATE (script đo lỗi)"
+elif grep -q 'MISS' "$TMP/hits.txt"; then
+  bad "hit@k $MODE" "có ca MISS ($rate)"
+elif [ "$MODE" = "fake" ]; then
+  ok "harness eval chạy với fake zm ($rate) — KHÔNG phải số chất lượng"
+else
+  ok "hit@k zeromem thật ($rate)"
+fi
 echo "zeromem-eval-test: $pass pass, $fail fail ($MODE)"
 [ $fail -eq 0 ] && echo "PASS" || exit 1
 ```
 
-Ghi chú về ngữ nghĩa: chế độ `fake` chỉ kiểm rằng harness chạy và in đúng định dạng. Kết quả chất lượng chỉ có ở chế độ `real`. CI chạy `fake`. Không được coi `fake` là đạt chất lượng.
+Ghi chú về ngữ nghĩa: chế độ `fake` chỉ kiểm rằng harness chạy và in đúng định dạng dòng evidence. CI chạy `fake`. Không được coi `fake` là đạt chất lượng. Chế độ `real` seed các phiên trong golden vào store tạm bằng `zm ingest`, recall qua `zeromem-bridge.py` với `--exclude-session` là `query_session`, và tính HIT khi có evidence của `expect_session` trong top-k.
+
+Giới hạn đã biết: golden hiện chỉ có 2 turn của phiên A và `k` là 3, nên truy vấn nào cũng HIT. Số `HITRATE 2/2` ở chế độ `real` (đo ngày 03/10/2026) chỉ chứng minh đường seed → recall chạy thông, chưa phải số chất lượng. Muốn tin được số này phải thêm phiên nhiễu và hạ `k` xuống 1. Việc này để sau.
 
 - [ ] **Step 6: chạy eval và commit**
 
@@ -1035,3 +1107,11 @@ git commit -m "feat(zeromem): memory-map --source zeromem chỉ đọc và eval 
   1. Session id trong fixture và test dài 9 ký tự (`aaaaaaaa1`), còn bridge in `sid[:8]`, nên test `grep` không bao giờ khớp. Sửa thành 8 ký tự (`aaaaaaaa`, `bbbbbbbb`) ở T2, T4 và T5. Lỗi này cũng có ở T4.
   2. `ensure_store` gọi `symlink_to` ngoài `try`, Windows không có quyền symlink nên vi phạm fail-open. Bọc trong `try` ở T2.
   Các task T2–T5 của run cũ được thay bằng run v2 với spec lấy lại từ PLAN này. T1 không đổi.
+- **PLAN v2.1 (03/10/2026).** Sửa PLAN cho khớp code đã commit ở T4 (`ebada577`) và T5 (`e4a9a48b`). Các khối code của hai task giờ là bản đã commit.
+  1. T4, `session_end.py`: file không có `_run` và không import `resolve_tool`, nên `zeromem_write` ở đây dùng `subprocess.run(timeout=12)` và import cục bộ. Bản PLAN cũ gây `NameError` bị `except` nuốt, nhánh SessionEnd chết im lặng.
+  2. T4, `session_end.py`: lời gọi đặt ngay sau dòng gán `root`, không phải sau `audit(...)`.
+  3. T4, test: fixture phải có `llmwiki/wiki`, nếu không `find_wiki_dir` trả `None` và `main()` thoát trước khi recall. Thêm ca SessionEnd không Traceback, tổng 6 ca.
+  4. T4: ba dòng `resolve_tool(... "harness/scripts/zeromem-bridge.py")` mang marker `# bare-path: ok`. `hooklib.py` không đổi ở T4.
+  5. T5, memory-map: bỏ cạnh `continues`, test chạy trong project tạm, thêm ca "không ghi đè `memory-map.html`" và kiểm rc khi schema lạ, tổng 4 ca.
+  6. T5, eval: bản cũ ở chế độ `real` chỉ kiểm output không rỗng, không seed và không đọc `expect_session`. Bản mới seed vào store tạm và kiểm `expect_session`; golden thêm `query_session`.
+  7. Hệ quả ngoài hai task: `harness/tests/session-chain-test.sh` ghim `memory.backend: mem-rank` trong fixture (commit `e35613f3`), vì backend mặc định `zeromem` làm SessionStart bỏ qua chuỗi mem-rank trên máy có `zm`.
