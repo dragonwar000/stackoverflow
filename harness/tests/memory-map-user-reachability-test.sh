@@ -94,7 +94,17 @@ rm -f "$M"; mv "$FXREPO/llmwiki/.harness-stamp" "$FXREPO/llmwiki/.harness-stamp.
 run_hook
 [ -f "$M" ] && bad "STAMP-control fail" "repo không stamp mà vẫn vẽ — opt-in bị bỏ qua" \
             || ok "STAMP-control: không .harness-stamp + không env → không vẽ (opt-in giữ nguyên)"
+# OPT-IN: repo KHÔNG stamp + env cũ OVERSTACK_WIKIGRAPH=1 → vẽ (đường opt-in cũ vẫn nhận qua công tắc)
+rm -f "$M"
+OVERSTACK_WIKIGRAPH=1 run_hook
+[ -f "$M" ] && ok "OPT-IN: không stamp + OVERSTACK_WIKIGRAPH=1 → vẫn vẽ (env cũ giữ hiệu lực)" \
+            || bad "OPT-IN fail" "env cũ =1 không còn bật được bộ nhớ thứ cấp ở dự án chưa stamp"
 mv "$FXREPO/llmwiki/.harness-stamp.off" "$FXREPO/llmwiki/.harness-stamp"
+# TẮT wikigraph KHÔNG được tắt bộ nhớ thứ cấp: có stamp + OVERSTACK_WIKIGRAPH=0 → vẫn vẽ memory-map
+rm -f "$M"
+OVERSTACK_WIKIGRAPH=0 run_hook
+[ -f "$M" ] && ok "có stamp + OVERSTACK_WIKIGRAPH=0 → bộ nhớ thứ cấp vẫn chạy (tắt graph không tắt bộ nhớ)" \
+            || bad "tắt wikigraph làm tắt bộ nhớ" "secondary_memory bị gác nhầm bằng công tắc wikigraph"
 # ENGINE negative-control: xóa engine global → KHÔNG vẽ (chứng minh graph ở trên đến từ global thật)
 rm -f "$M" "$FXHOME/harness/scripts/scratch-log.py"
 run_hook

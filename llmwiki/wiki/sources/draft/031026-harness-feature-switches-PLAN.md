@@ -1149,3 +1149,11 @@ git commit -m "docs(feature-switch): kiểm nhất quán hai copy và policy, đ
   - **Vá sau T3 (`86cdb6a8`, `1047580b`).** Coordinator đã chỉ sai cho worker: bảo đổi điều kiện của `secondary_memory` sang `default=(is_framework or has_stamp)`, làm cho việc tắt `wikigraph` tắt luôn bộ nhớ thứ cấp. Đã trả về dạng PLAN v1. Test `memory-map-user-reachability-test.sh` còn grep chuỗi env cũ nên đỏ; đã sửa assertion.
   - **T4 (`a3544d0a`, dòng index ở `0b9b4623`).** Test nhất quán kiểm thêm `GUARDRAIL_FALLBACK`. Trang concept viết theo code, có mục "Giới hạn đã biết".
   - **Còn mở.** Validator R19 chưa nhận `OVERSTACK_FEATURE_EVIDENCE_TERMINAL`. Stop có thể in hai dòng stderr khi `wikigraph` tắt tường minh. Nhánh nhắc ở `session_start.py` mới kiểm được điều kiện gác, chưa quan sát đầu-cuối. Hook không ghi `feature-switch.jsonl`; chỉ CLI và validator ghi.
+- **PLAN v1.2 (03/10/2026).** Đóng các điểm còn mở của v1.1, làm ngoài bốn task:
+  - Validator R19 nhận `OVERSTACK_FEATURE_EVIDENCE_TERMINAL` (hai copy giống hệt, self-test thêm bốn ca). Thứ tự: cờ > env mới > env cũ > file cục bộ > config.
+  - Thêm `harness/tests/feature-switch-hooks-test.sh`: 8 ca chạy `session_start.py` thật, quan sát được lời nhắc wiki-graph và dòng stderr khi tắt tường minh.
+  - `memory-map-user-reachability-test.sh` thêm hai ca: env cũ `=1` vẫn bật bộ nhớ thứ cấp ở dự án chưa stamp, và `=0` ở dự án có stamp không tắt bộ nhớ.
+  - Điểm "Stop in hai dòng stderr" không còn: sau `86cdb6a8`, `stop.py` chỉ gọi `feature_enabled` một lần cho `wikigraph`.
+  - Khối trang concept trong Task 4 của PLAN là bản ở `a3544d0a`; bản hiện hành nằm ở `llmwiki/wiki/concepts/feature-switches.md`.
+  - Vẫn mở: hook không ghi `feature-switch.jsonl` (chỉ CLI và validator ghi); validator không nhận cờ `--feature`.
+

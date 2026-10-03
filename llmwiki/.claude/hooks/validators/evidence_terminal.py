@@ -153,10 +153,19 @@ def _load_cfg_base(root: Path) -> dict:
 
 
 def switch_state(argv, env, cfg):
-    """Ba tang, uu tien tu HEP toi RONG: co CLI > bien moi truong > file config.
+    """Uu tien tu HEP toi RONG: co CLI > env OVERSTACK_FEATURE_EVIDENCE_TERMINAL > env cu
+    OVERSTACK_EVIDENCE_TERMINAL > file config (da gop features.local.yaml o load_cfg).
     Tra (enabled, layer). layer noi ro TANG NAO da tat — de thong bao khong mo ho."""
     if "--no-evidence-chain" in argv:
         return False, "co --no-evidence-chain"
+    # env chung cua cong tac (cung khuon hooklib.feature_on): thang env cu, file cuc bo va config.
+    new = env.get("OVERSTACK_FEATURE_EVIDENCE_TERMINAL")
+    if new is not None:
+        v = str(new).strip().lower()
+        if v in ("off", "0", "false", "no"):
+            return False, "bien moi truong OVERSTACK_FEATURE_EVIDENCE_TERMINAL"
+        if v in ("on", "1", "true", "yes"):
+            return True, ""
     raw = env.get("OVERSTACK_EVIDENCE_TERMINAL")
     if raw is not None and str(raw).strip().lower() in ("0", "false", "off"):
         return False, "bien moi truong OVERSTACK_EVIDENCE_TERMINAL"
@@ -397,6 +406,23 @@ def self_test() -> int:
     en, layer = switch_state([], {}, {"enabled": False})
     if en or "config" not in layer:
         fails.append("config enabled: false phai tat duoc")
+
+    en, layer = switch_state([], {"OVERSTACK_FEATURE_EVIDENCE_TERMINAL": "off"}, {"enabled": True})
+    if en or "OVERSTACK_FEATURE_EVIDENCE_TERMINAL" not in layer:
+        fails.append("env OVERSTACK_FEATURE_EVIDENCE_TERMINAL=off phai tat duoc")
+
+    en, _ = switch_state([], {"OVERSTACK_FEATURE_EVIDENCE_TERMINAL": "on", "OVERSTACK_EVIDENCE_TERMINAL": "0"},
+                         {"enabled": False})
+    if not en:
+        fails.append("env OVERSTACK_FEATURE_EVIDENCE_TERMINAL=on phai THANG env cu va config")
+
+    en, layer = switch_state(["--no-evidence-chain"], {"OVERSTACK_FEATURE_EVIDENCE_TERMINAL": "on"}, {"enabled": True})
+    if en:
+        fails.append("co CLI phai THANG env OVERSTACK_FEATURE_EVIDENCE_TERMINAL=on")
+
+    en, _ = switch_state([], {"OVERSTACK_EVIDENCE_TERMINAL": "1"}, {"enabled": False})
+    if en:
+        fails.append("env cu =1 KHONG duoc thang config enabled: false")
 
     en, _ = switch_state([], {}, {"enabled": True})
     if not en:

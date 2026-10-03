@@ -33,7 +33,7 @@ Với công tắc thường (`feature`, `gate`), `feature_on` trả kết quả 
 Lớp là thuộc tính `class` trong `features.yaml`. Trường `switch` trong `harness/poc-vendor-neutral/policy.yaml` cũng có ba giá trị, nhưng đó là **phân loại của rule**, không phải đường tắt rule.
 
 - **guardrail** — `egress-guard` (chặn egress, hook `pre_tool_use.py`), `orca-guard` (chặn lệnh Bash sai của orchestration, hook `orca_guard.py`), `inject-scan` (quét prompt injection; `consumer: null`, chưa có điểm gác trong hook). Tắt bằng `feature-switch off <id> --acknowledge-guardrail`, ghi vào `features.local.yaml`. Không có đường env hay config.
-- **gate** — `evidence-terminal` (R19, validator `evidence_terminal.py`). Tắt được qua file cục bộ, cờ `--no-evidence-chain`, hoặc env cũ `OVERSTACK_EVIDENCE_TERMINAL=0|false|off` (xem giới hạn bên dưới).
+- **gate** — `evidence-terminal` (R19, validator `evidence_terminal.py`). Tắt được qua file cục bộ, cờ `--no-evidence-chain`, env `OVERSTACK_FEATURE_EVIDENCE_TERMINAL=off`, hoặc env cũ `OVERSTACK_EVIDENCE_TERMINAL=0|false|off`.
 - **feature** — `wikigraph`, `goal-hook`, `self-report`, `agent-trace`. Tắt tự do; mặc định của từng công tắc giữ nguyên.
 
 Trong `policy.yaml`: R1 (no-write-raw) và R14 (patterns-protected) có `switch: guardrail`, 20 rule còn lại có `switch: gate`. Không có code nào đọc trường này để tắt rule. Rule là bất biến: không rule nào bị xoá hay bị tắt bởi công tắc.
@@ -66,7 +66,7 @@ python3 harness/scripts/feature-switch.py off <id> [--acknowledge-guardrail]
 | `goal-hook` | feature | bật | `user_prompt_submit.py` | `OVERSTACK_GOAL_HOOK=0` tắt |
 | `self-report` | feature | bật | chưa gắn | `OVERSTACK_SELF_REPORT_EVERY` là số, không phải công tắc |
 | `agent-trace` | feature | tắt | `agent-trace.py` | bật/tắt qua `agent-trace.py`, không qua file cục bộ |
-| `evidence-terminal` | gate | bật | validator R19 | xem giới hạn bên dưới |
+| `evidence-terminal` | gate | bật | validator R19 | validator tự đọc công tắc, cùng thứ tự với `feature_on` |
 | `egress-guard` | guardrail | bật | `pre_tool_use.py` | mode warn/block ở `harness/egress-guard.config.yaml` là việc khác |
 | `orca-guard` | guardrail | bật | `orca_guard.py` | |
 | `inject-scan` | guardrail | bật | chưa gắn | tắt bị từ chối vì chưa có điểm gác |
@@ -75,7 +75,7 @@ python3 harness/scripts/feature-switch.py off <id> [--acknowledge-guardrail]
 
 ## Giới hạn đã biết
 
-- **Validator R19 chưa nhận `OVERSTACK_FEATURE_EVIDENCE_TERMINAL`.** Validator giữ `load_cfg` cũ (đọc qua `bnal_config` khi có, rồi `harness/evidence-terminal.config.yaml`), thêm lớp `features.local.yaml` thắng config. Thứ tự thật trong validator: cờ `--no-evidence-chain` > env cũ `OVERSTACK_EVIDENCE_TERMINAL` > `features.local.yaml` > config. Env `=1` không thắng `enabled: false` trong config.
+- **Validator R19 tự đọc công tắc, không gọi `feature_on`.** Validator giữ `load_cfg` cũ (đọc qua `bnal_config` khi có, rồi `harness/evidence-terminal.config.yaml`), thêm lớp `features.local.yaml` thắng config. Thứ tự trong validator: cờ `--no-evidence-chain` > env `OVERSTACK_FEATURE_EVIDENCE_TERMINAL` > env cũ `OVERSTACK_EVIDENCE_TERMINAL` > `features.local.yaml` > config. Env cũ `=1` không thắng `enabled: false` trong config; env mới `=on` thì thắng. Validator không nhận cờ `--feature`.
 - Validator đọc `features.local.yaml` chỉ nhận bool hoặc chuỗi `on`/`off`; `hooklib` nhận thêm `1/0/yes/no`.
 - Hook không ghi nhật ký tắt; chỉ CLI và validator ghi `feature-switch.jsonl`.
 - Trường `switch` của policy chỉ được test nhất quán kiểm (`harness/tests/feature-switch-consistency-test.sh`), chưa có cơ chế tắt rule.
@@ -84,6 +84,8 @@ python3 harness/scripts/feature-switch.py off <id> [--acknowledge-guardrail]
 
 - `harness/tests/feature-switch-test.sh` — 22 ca ma trận `feature_on`.
 - `harness/tests/feature-switch-cli-test.sh` — 7 ca CLI.
+- `harness/tests/feature-switch-hooks-test.sh` — 8 ca đầu-cuối qua `session_start.py` thật: lời nhắc wiki-graph theo mặc định, env cũ, env mới, file cục bộ, và dòng stderr khi tắt tường minh.
+- `harness/tests/memory-map-user-reachability-test.sh` — có ca tắt `wikigraph` mà bộ nhớ thứ cấp vẫn chạy.
 - `harness/tests/feature-switch-consistency-test.sh` — hai copy `evidence_terminal.py` giống hệt; mọi rule có `switch` hợp lệ; đúng hai guardrail là R1 và R14; mọi id trong `GUARDRAIL_FALLBACK` là `class: guardrail` trong `features.yaml`. Chạy trong `.github/workflows/harness.yml`.
 
 ## Origin
