@@ -247,9 +247,9 @@ pass=0; fail=0
 ok(){ printf '  \033[1;32m✓\033[0m %s\n' "$1"; pass=$((pass+1)); }
 bad(){ printf '  \033[1;31m✗\033[0m %s — %s\n' "$1" "$2"; fail=$((fail+1)); }
 
-out=$(python3 "$BRIDGE" recall --root "$TMP" --query "kho sach" --exclude-session bbbbbbbb2 2>"$TMP/err")
+out=$(python3 "$BRIDGE" recall --root "$TMP" --query "kho sach" --exclude-session bbbbbbbb 2>"$TMP/err")
 rc=$?
-[ $rc -eq 0 ] && echo "$out" | grep -q 'aaaaaaaa1' && ! echo "$out" | grep -q 'bbbbbbbb2' \
+[ $rc -eq 0 ] && echo "$out" | grep -q 'aaaaaaaa' && ! echo "$out" | grep -q 'bbbbbbbb' \
   && ok "recall loại đúng phiên hiện tại" || bad "recall loại phiên" "rc=$rc out=$out"
 
 out=$(ZEROMEM_ZM=/does/not/exist python3 "$BRIDGE" recall --root "$TMP" --query x 2>"$TMP/err2")
@@ -260,10 +260,10 @@ rc=$?
 out=$(python3 "$BRIDGE" stats --root "$TMP" 2>/dev/null)
 echo "$out" | grep -q '"embedder_is_fallback": true' && ok "stats trả trường embedder_is_fallback" || bad "stats" "$out"
 
-python3 "$BRIDGE" forget-session --root "$TMP" --session aaaaaaaa1 >/dev/null 2>&1
+python3 "$BRIDGE" forget-session --root "$TMP" --session aaaaaaaa >/dev/null 2>&1
 [ $? -eq 0 ] && ok "forget-session chạy không lỗi" || bad "forget-session" "rc khác 0"
 
-python3 "$BRIDGE" ingest --root "$TMP" --session aaaaaaaa1 --transcript "" >/dev/null 2>&1
+python3 "$BRIDGE" ingest --root "$TMP" --session aaaaaaaa --transcript "" >/dev/null 2>&1
 [ $? -eq 0 ] && ok "ingest không có transcript → rc 0 không làm gì" || bad "ingest rỗng" "rc khác 0"
 
 echo "zeromem-bridge-test: $pass pass, $fail fail"
@@ -291,8 +291,8 @@ if args[:1] != ["mcp"]:
     sys.exit(2)
 
 EVIDENCE = [
-    {"turn_id": 1, "session_id": "aaaaaaaa1", "session_turn": 0, "speaker": "user", "text": "Carrie lo kho sach", "ts": 1, "score": 1.0},
-    {"turn_id": 2, "session_id": "bbbbbbbb2", "session_turn": 0, "speaker": "user", "text": "phien hien tai", "ts": 2, "score": 0.9},
+    {"turn_id": 1, "session_id": "aaaaaaaa", "session_turn": 0, "speaker": "user", "text": "Carrie lo kho sach", "ts": 1, "score": 1.0},
+    {"turn_id": 2, "session_id": "bbbbbbbb", "session_turn": 0, "speaker": "user", "text": "phien hien tai", "ts": 2, "score": 0.9},
 ]
 out = []
 for line in sys.stdin:
@@ -371,7 +371,10 @@ def ensure_store(home: Path) -> Path:
     link = home / "models"
     shared_models = shared_home() / "models"
     if shared_models.is_dir() and not link.exists() and not link.is_symlink():
-        link.symlink_to(shared_models, target_is_directory=True)
+        try:
+            link.symlink_to(shared_models, target_is_directory=True)
+        except OSError:
+            pass  # Windows không có quyền symlink: zm tự tải model vào <home>/models, không chặn phiên
     return home
 
 
@@ -679,12 +682,12 @@ PROJ="$TMP/proj"; mkdir -p "$PROJ/harness" "$PROJ/llmwiki"
 git -C "$PROJ" init -q && git -C "$PROJ" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "feat: xuất csv"
 cp harness/mem-rank.config.yaml "$PROJ/harness/" && cp -r harness/scripts "$PROJ/harness/" && mkdir -p "$PROJ/harness/tests" && cp -r harness/tests/fixtures "$PROJ/harness/tests/"
 
-out=$(echo '{"session_id":"bbbbbbbb2","cwd":"'"$PROJ"'"}' | CLAUDE_PROJECT_DIR="$PROJ" python3 llmwiki/.claude/hooks/session_start.py 2>/dev/null)
-echo "$out" | grep -q 'Trí nhớ zeromem' && echo "$out" | grep -q 'aaaaaaaa1' && ! echo "$out" | grep -q 'bbbbbbbb2' \
+out=$(echo '{"session_id":"bbbbbbbb","cwd":"'"$PROJ"'"}' | CLAUDE_PROJECT_DIR="$PROJ" python3 llmwiki/.claude/hooks/session_start.py 2>/dev/null)
+echo "$out" | grep -q 'Trí nhớ zeromem' && echo "$out" | grep -q 'aaaaaaaa' && ! echo "$out" | grep -q 'bbbbbbbb' \
   && ok "SessionStart in recall zeromem, loại phiên hiện tại" || bad "SessionStart recall" "$(echo "$out" | head -5)"
 
 sed -i.bak 's/backend: zeromem/backend: mem-rank/' "$PROJ/harness/mem-rank.config.yaml"
-out=$(echo '{"session_id":"bbbbbbbb2","cwd":"'"$PROJ"'"}' | CLAUDE_PROJECT_DIR="$PROJ" python3 llmwiki/.claude/hooks/session_start.py 2>/dev/null)
+out=$(echo '{"session_id":"bbbbbbbb","cwd":"'"$PROJ"'"}' | CLAUDE_PROJECT_DIR="$PROJ" python3 llmwiki/.claude/hooks/session_start.py 2>/dev/null)
 echo "$out" | grep -q 'Trí nhớ zeromem' && bad "backend mem-rank" "vẫn in recall zeromem" || ok "backend mem-rank không in recall zeromem"
 
 echo "zeromem-hooks-test: $pass pass, $fail fail"
@@ -836,7 +839,7 @@ mkdir -p "$STORE" && python3 - "$STORE/zeromem.db" <<'PY'
 import sqlite3, sys
 con = sqlite3.connect(sys.argv[1])
 con.execute("CREATE TABLE turns (id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, session_turn INTEGER NOT NULL, speaker TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL)")
-rows = [("aaaaaaaa1-x", 0, "user", "xuat csv", 100), ("aaaaaaaa1-x", 1, "assistant", "da xong", 101), ("bbbbbbbb2-y", 0, "user", "sua hook", 200)]
+rows = [("aaaaaaaa-x", 0, "user", "xuat csv", 100), ("aaaaaaaa-x", 1, "assistant", "da xong", 101), ("bbbbbbbb-y", 0, "user", "sua hook", 200)]
 con.executemany("INSERT INTO turns (session_id, session_turn, speaker, text, ts) VALUES (?,?,?,?,?)", rows)
 con.commit(); con.close()
 PY
@@ -974,7 +977,7 @@ g = json.load(open(f"{root}/harness/evals/zeromem-cross-session.json", encoding=
 hit = 0
 for case in g["cases"]:
     out = subprocess.run([sys.executable, f"{root}/harness/scripts/zeromem-bridge.py", "recall",
-                          "--root", root, "--query", case["query"], "--exclude-session", "zzzzzzzz9",
+                          "--root", root, "--query", case["query"], "--exclude-session", "zzzzzzzz",
                           "--top-k", str(case["k"])], capture_output=True, text=True).stdout
     ok = bool(out.strip()) if mode == "fake" else out.strip() != ""
     hit += int(ok)
@@ -1025,3 +1028,10 @@ git commit -m "feat(zeromem): memory-map --source zeromem chỉ đọc và eval 
 - Chạy test của task trước trước khi làm task sau. Task 3 sửa cùng file bridge với Task 2, nên không chạy song song.
 - Test dùng fake zm. Muốn kết quả chất lượng thật, chạy `ZEROMEM_E2E=1` trên máy đã có zm và model, và ghi số đo vào log.
 - Không tự cài bản fork archify `macos`. Không đẩy PR của task nào mà chưa được duyệt riêng.
+
+## Lịch sử sửa
+
+- **PLAN v2 (03/10/2026).** Worker T2 dry-run và dừng đúng quy trình, báo hai lỗi thật của PLAN v1:
+  1. Session id trong fixture và test dài 9 ký tự (`aaaaaaaa1`), còn bridge in `sid[:8]`, nên test `grep` không bao giờ khớp. Sửa thành 8 ký tự (`aaaaaaaa`, `bbbbbbbb`) ở T2, T4 và T5. Lỗi này cũng có ở T4.
+  2. `ensure_store` gọi `symlink_to` ngoài `try`, Windows không có quyền symlink nên vi phạm fail-open. Bọc trong `try` ở T2.
+  Các task T2–T5 của run cũ được thay bằng run v2 với spec lấy lại từ PLAN này. T1 không đổi.
