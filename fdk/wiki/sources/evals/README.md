@@ -10,6 +10,7 @@ Each `*.md` file here is a **golden** for the WikiEval suite
 | `expected` | yes\*    | the reference answer (used by the optional tier-2 similarity) |
 | `rubric`   | no       | instructions for the tier-3 LLM judge (the quarantined adapter) |
 | `asserts`  | no       | tier-1 deterministic checks (the build-now core) |
+| `expected_is` | no    | `exemplar` (default): `expected` is a reference answer and must satisfy its own asserts in `--self-test`. `description`: `expected` only describes a passing answer, so `--self-test` skips it and prints `[SKIP]` |
 
 \* a file is treated as a golden if it has frontmatter with at least one of
 `input` / `expected` / `asserts`.

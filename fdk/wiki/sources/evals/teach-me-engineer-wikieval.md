@@ -4,6 +4,7 @@ id: teach-me-engineer-wikieval
 title: "teach-me cho engineer — tầng 1 (tier-1 asserts) của wikieval chạy thế nào"
 input: "teach me: tầng 1 (tier-1 deterministic asserts) trong harness/scripts/wikieval.py chạy thế nào?"
 expected: "Người nghe mặc định là engineer. Đủ bảy phần đúng thứ tự. Cơ chế neo vào hàm thật (run_golden gọi eval_assert cho từng assert; golden có asserts thì tầng 1 tự quyết, all() mới đạt; op lạ fail closed) và có ít nhất một quan sát chạy thật (chạy wikieval.py với một outputs cụ thể, thấy kết quả). Có sơ đồ mermaid. Trade-off (rẻ, tất định, không cần model — đổi lấy việc chỉ bắt được dấu hiệu bề mặt) tách khỏi Giới hạn (regex không cờ mặc định, không hiểu ngữ nghĩa)."
+expected_is: description
 asserts:
   - 'regex:(?s)Tên gọi.*Nguồn gốc.*Lý do tồn tại.*Cơ chế hoạt động.*Trade-off.*Giới hạn.*Vị trí'
   - 'contains:```mermaid'

@@ -1,12 +1,12 @@
 {
   "schema": "wikieval-baseline/v1",
   "generated_by": "harness/scripts/wikieval.py",
-  "generated_at": "2026-09-08",
+  "generated_at": "2026-10-04",
   "evals_dir": "fdk/wiki/sources/evals",
   "summary": {
-    "goldens": 7,
-    "decided": 7,
-    "passed": 7
+    "goldens": 18,
+    "decided": 14,
+    "passed": 13
   },
   "goldens": {
     "adapt-modes-pick": {
@@ -37,6 +37,53 @@
         "icontains:unproven",
         "regex:(?i)(capproof|bằng chứng)",
         "regex:(?i)ratchet|nợ"
+      ]
+    },
+    "context-guard-cache-read": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:cache_read",
+        "icontains:input_tokens",
+        "regex:(?i)context_window|cửa sổ context",
+        "icontains:cache_creation"
+      ]
+    },
+    "downstream-layout-awareness": {
+      "pass": null,
+      "score": null,
+      "decided_by": null
+    },
+    "feature-switch-guardrail-off": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:acknowledge-guardrail",
+        "icontains:features.local.yaml",
+        "regex:(?i)(không tắt được|không có hiệu lực|bị bỏ qua|bỏ qua env|không thể tắt)"
+      ]
+    },
+    "feature-switch-wikigraph-memory": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:stamp",
+        "regex:(?i)(không còn (được )?vẽ|không vẽ|ngừng vẽ|tắt (việc )?vẽ|graph (bị )?tắt)",
+        "regex:(?i)(bộ nhớ thứ cấp|secondary_memory)[^.]*(vẫn|không bị)"
+      ]
+    },
+    "hook-gate-consistency": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:template-manifest",
+        "icontains:find_wiki_dir",
+        "icontains:recall",
+        "regex:(?i)session.?start"
       ]
     },
     "merge-fork-identity": {
@@ -70,6 +117,17 @@
         "regex:(?i)\\borigin\\b"
       ]
     },
+    "r3-index-sync-gate": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "regex:(?i)wiki-index-sync|pre-commit",
+        "icontains:pre-commit",
+        "regex:(?i)git add|tracked|đã commit",
+        "icontains:index"
+      ]
+    },
     "sql-active-users": {
       "pass": true,
       "score": 1.0,
@@ -79,6 +137,43 @@
         "icontains:select",
         "contains:FROM",
         "regex:(?i)\\bwhere\\b"
+      ]
+    },
+    "teach-me-eli5-merge-conflict": {
+      "pass": null,
+      "score": null,
+      "decided_by": null
+    },
+    "teach-me-engineer-wikieval": {
+      "pass": null,
+      "score": null,
+      "decided_by": null
+    },
+    "teach-me-manager-syncskill": {
+      "pass": null,
+      "score": null,
+      "decided_by": null
+    },
+    "zeromem-backend-fallback": {
+      "pass": true,
+      "score": 1.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:zeromem",
+        "icontains:mem-rank",
+        "icontains:mem-rank.config.yaml",
+        "regex:(?i)(rơi về|fallback|fall back|fail-open về|quay về|lùi về|tạm dùng|hạ cấp)"
+      ]
+    },
+    "zeromem-session-end-write": {
+      "pass": false,
+      "score": 0.0,
+      "decided_by": "tier1-asserts",
+      "asserts": [
+        "icontains:subprocess",
+        "icontains:_run",
+        "regex:(?i)(ngân sách|budget)",
+        "regex:(?i)(NameError|không có _run|không định nghĩa|chưa định nghĩa|không tồn tại)"
       ]
     }
   }

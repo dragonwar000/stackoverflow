@@ -4,6 +4,7 @@ id: teach-me-eli5-merge-conflict
 title: "teach-me ELI5 — git merge conflict cho trẻ 5 tuổi"
 input: "ELI5: git merge conflict là gì? Giải thích cho con tôi 5 tuổi."
 expected: "Người nghe là trẻ 5 tuổi. Đủ bảy phần đúng thứ tự (được thêm phụ đề đời thường), kể như câu chuyện với một phép so sánh quen với trẻ (hai bạn cùng tô một bức tranh / cùng viết một trang). Có chạy thật một conflict nhỏ để chứng, nhưng không dán log thô hay dấu <<<<<<< cho trẻ. Không thuật ngữ git trần (rebase, HEAD, SHA). Câu ngắn, giọng vui."
+expected_is: description
 asserts:
   - 'regex:(?s)Tên gọi.*Nguồn gốc.*Lý do tồn tại.*Cơ chế hoạt động.*Trade-off.*Giới hạn.*Vị trí'
   - 'regex:(?i)tưởng tượng|giống như|giống hệt|cũng như'

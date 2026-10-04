@@ -4,6 +4,7 @@ id: teach-me-manager-syncskill
 title: "teach-me cho manager — sync-skill.sh để làm gì, có đáng giữ không"
 input: "Giải thích cho sếp (manager) của tôi: fdk/tools/sync-skill.sh để làm gì, có đáng giữ không?"
 expected: "Người nghe là manager. Đủ bảy phần đúng thứ tự nhưng nói bằng tác động: một bản skill phải có mặt ở ba chỗ (bản gốc, bản gương trong llmwiki, bản cài trên máy); sửa tay dễ quên một chỗ khiến máy khác nhận bản cũ; script chép cả ba trong một lệnh rồi tự so khớp. Trade-off/Giới hạn nói bằng rủi ro, công sức. Không có khối code, không backtick. Chốt bằng một đề xuất rõ (giữ/bỏ) cho sếp."
+expected_is: description
 asserts:
   - 'regex:(?s)Tên gọi.*Nguồn gốc.*Lý do tồn tại.*Cơ chế hoạt động.*Trade-off.*Giới hạn.*Vị trí'
   - 'regex:^(?![\s\S]*```(?:bash|sh|shell|console|python|py)\b)'

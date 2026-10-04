@@ -236,7 +236,8 @@ def load_goldens(evals_dir):
         seen[gid] = p
         out.append({"id": gid, "path": str(p), "input": data.get("input"),
                     "expected": data.get("expected"), "rubric": data.get("rubric"),
-                    "asserts": data.get("asserts") or []})
+                    "asserts": data.get("asserts") or [],
+                    "expected_is": str(data.get("expected_is") or "exemplar").strip().lower()})
     return out
 
 
@@ -351,7 +352,12 @@ def self_test(evals_dir, cfg):
             print("[wikieval selftest] evals dir vắng → hermetic engine-fixture (global engine)")
             return self_test(d, cfg)
     goldens = load_goldens(evals_dir)
-    with_asserts = [g for g in goldens if g.get("asserts")]
+    # `expected_is: description` — `expected` MÔ TẢ câu trả lời đạt (vd "đủ bảy phần, không backtick") chứ không
+    # phải một câu trả lời mẫu. Chạy assert lên lời mô tả thì luôn trượt và không chứng minh được gì → bỏ qua, có in ra.
+    described = [g for g in goldens if g.get("asserts") and g.get("expected_is") == "description"]
+    with_asserts = [g for g in goldens if g.get("asserts") and g.get("expected_is") != "description"]
+    for g in sorted(described, key=lambda x: x["id"]):
+        print(f"  [SKIP] {g['id']:<18} expected là lời mô tả (expected_is: description) — không tự chấm được")
     if not with_asserts:
         print("[wikieval selftest] no golden declares tier-1 asserts — nothing deterministic to validate.")
         return 1
