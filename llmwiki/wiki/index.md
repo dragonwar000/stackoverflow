@@ -337,3 +337,4 @@
 | [031026-zeromem-t1-install-report](sources/draft/031026-zeromem-t1-install-report.md) | draft | Báo cáo Task 1 zeromem: script cài và kiểm sha256 model theo lock, test 3/3 pass, commit 06d52149; chưa cài zm và model thật |
 | [031026-harness-feature-switches-PLAN](sources/draft/031026-harness-feature-switches-PLAN.md) | draft | PLAN thi hành công tắc bật/tắt harness: 4 task (registry + feature_on, CLI, chuyển cờ + policy switch, kiểm nhất quán); chờ dispatch |
 | [031026-recent-work-report](sources/draft/031026-recent-work-report.md) | draft | Output-report: trang tổng kết năm việc gần đây (merge upstream, zeromem, công tắc harness) |
+| [041026-coordinator-session-report](sources/draft/041026-coordinator-session-report.md) | draft | Output-report: trang báo cáo phiên điều phối 03–04/10 (zeromem T4–T5, công tắc harness T1–T4, bản vá, CI, wikieval) |
