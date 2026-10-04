@@ -405,6 +405,12 @@ PYEOF
         log "  global harness chưa có ($GH_HOME) → cài install-harness.sh --global"
       fi
       IH="$SRC/../scripts/install-harness.sh"
+      # Nguồn là cây local (REPO_RAW=file://…): dùng thẳng install-harness.sh của cây đó. Bản tải rời vào mktemp không
+      # có bundle cạnh script nên sẽ clone template @main từ GitHub — bản đó có thể CŨ hơn cây đang cài (engine cũ đè lên).
+      LOCAL_IH="${REPO_RAW#file://}/harness/scripts/install-harness.sh"
+      if [ ! -f "$IH" ] && [ "${REPO_RAW#file://}" != "$REPO_RAW" ] && [ -f "$LOCAL_IH" ]; then
+        IH="$LOCAL_IH"
+      fi
       if [ ! -f "$IH" ]; then
         IH="$(mktemp)"
         curl -fsSL "$REPO_RAW/harness/scripts/install-harness.sh" -o "$IH" 2>/dev/null || IH=""
